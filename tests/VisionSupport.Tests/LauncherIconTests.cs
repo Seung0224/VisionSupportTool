@@ -10,6 +10,9 @@ namespace VisionSupport.Tests;
 /// Every tile names its icon with a string, so a typo cannot fail the build - the binding just
 /// resolves to nothing and the tile comes up blank. This is the check that would otherwise only
 /// happen by someone running the app and squinting at it.
+///
+/// It covers the shipped link tile too - that one's icon is a string in a settings file, which is
+/// even easier to get wrong than a string in code.
 /// </summary>
 public class LauncherIconTests
 {

@@ -16,6 +16,13 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
   </PropertyGroup>
 
+  <!-- The pure halves of the interop helpers (parsing a registry command, building a command
+       line) are worth testing but not worth publishing, so the tests see internals rather than
+       the helpers growing a public surface for their benefit. -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="VisionSupport.Tests" />
+  </ItemGroup>
+
   <ItemGroup>
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
     <PackageReference Include="MahApps.Metro.IconPacks.Material" Version="6.2.1" />

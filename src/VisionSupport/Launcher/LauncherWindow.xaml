@@ -208,6 +208,7 @@
             <Grid.ContextMenu>
                 <ContextMenu Background="{StaticResource Panel}" Foreground="{StaticResource Fg}">
                     <MenuItem x:Name="OverviewMenuItem" Header="전체보기"/>
+                    <MenuItem x:Name="LinksMenuItem" Header="링크 편집"/>
                     <Separator/>
                     <MenuItem x:Name="ExitMenuItem" Header="종료"/>
                 </ContextMenu>

@@ -52,23 +52,36 @@ public sealed class LauncherSettings
 
     public double IconSize { get; set; } = DefaultIconSize;
 
+    /// <summary>
+    /// The user's own web tiles. Null means "this file has never had them" and gets the shipped
+    /// default; an empty list means the user removed them all and is left alone.
+    /// </summary>
+    public List<LauncherLink>? Links { get; set; }
+
     public static string DefaultPath => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
         "VisionSupport", "launcher.json");
 
     public static LauncherSettings Load(string path)
     {
+        LauncherSettings settings = Read(path);
+
+        settings.IconHue = ClampHue(settings.IconHue);
+        settings.IconOpacity = ClampOpacity(settings.IconOpacity);
+        settings.IconSize = ClampIconSize(settings.IconSize);
+        settings.Links ??= LauncherLink.Defaults();
+
+        return settings;
+    }
+
+    private static LauncherSettings Read(string path)
+    {
         try
         {
             if (!File.Exists(path)) return new LauncherSettings();
 
-            var loaded = JsonSerializer.Deserialize<LauncherSettings>(File.ReadAllText(path));
-            if (loaded is null) return new LauncherSettings();
-
-            loaded.IconHue = ClampHue(loaded.IconHue);
-            loaded.IconOpacity = ClampOpacity(loaded.IconOpacity);
-            loaded.IconSize = ClampIconSize(loaded.IconSize);
-            return loaded;
+            return JsonSerializer.Deserialize<LauncherSettings>(File.ReadAllText(path))
+                   ?? new LauncherSettings();
         }
         catch (Exception ex) when (ex is IOException or JsonException or UnauthorizedAccessException)
         {

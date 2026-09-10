@@ -73,6 +73,7 @@ public partial class LauncherWindow : Window
         Fab.MouseLeave += (_, _) => AnimateFabZoom(1.0);
 
         OverviewMenuItem.Click += (_, _) => viewModel.ShowOverview();
+        LinksMenuItem.Click += (_, _) => viewModel.ShowLinks();
         ExitMenuItem.Click += async (_, _) => await viewModel.ExitAsync();
 
         KeyDown += (_, e) =>

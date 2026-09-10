@@ -36,6 +36,7 @@ public sealed partial class LauncherViewModel : ObservableObject
     private readonly Dictionary<IFeatureModule, FeatureWindow> _open = new();
 
     private OverviewDialog? _overview;
+    private LinksDialog? _links;
 
     [ObservableProperty]
     private bool _isExpanded;
@@ -50,30 +51,58 @@ public sealed partial class LauncherViewModel : ObservableObject
         _startedAt = startedAt;
         Appearance = appearance;
 
-        Point[] offsets = RadialLayout.Offsets(modules.Count + 1, MenuRadius);
+        foreach (IFeatureModule module in modules)
+        {
+            module.Changed += OnModuleChanged;
+            _activity.Add(module.Title, "준비됨");
+        }
+
+        Links = new ObservableCollection<LauncherLink>(settings.Links ?? LauncherLink.Defaults());
+        RebuildItems();
+    }
+
+    /// <summary>
+    /// Lays the tiles out around the circle. Called again whenever the user adds or removes a
+    /// link: the ring divides by however many items there are, so every tile moves when the
+    /// count changes.
+    /// </summary>
+    public void RebuildItems()
+    {
+        Items.Clear();
+
+        Point[] offsets = RadialLayout.Offsets(_modules.Count + Links.Count + 1, MenuRadius);
 
         // The tile sits on the circle; the label hangs below it. So the item is centred
         // horizontally on its own width but vertically on the tile's, not the item's.
         double centreX = ExpandedSize / 2 - ItemWidth / 2;
         double centreY = ExpandedSize / 2 - TileSize / 2;
 
-        for (int i = 0; i < modules.Count; i++)
-        {
-            IFeatureModule module = modules[i];
-            Items.Add(new LauncherItem(module.Glyph, module.Title,
-                centreX + offsets[i].X, centreY + offsets[i].Y,
-                () => Open(module), module));
+        int slot = 0;
 
-            module.Changed += OnModuleChanged;
-            _activity.Add(module.Title, "준비됨");
+        foreach (IFeatureModule module in _modules)
+        {
+            Point at = offsets[slot++];
+            Items.Add(new LauncherItem(module.Glyph, module.Title,
+                centreX + at.X, centreY + at.Y, () => Open(module), module));
         }
 
-        Point last = offsets[^1];
+        foreach (LauncherLink link in Links)
+        {
+            LauncherLink captured = link;
+            Point at = offsets[slot++];
+            Items.Add(new LauncherItem(captured.Glyph, captured.Title,
+                centreX + at.X, centreY + at.Y, () => OpenLink(captured)));
+        }
+
+        Point last = offsets[slot];
         Items.Add(new LauncherItem("ViewDashboardOutline", "전체보기",
             centreX + last.X, centreY + last.Y, ShowOverview));
     }
 
     public ObservableCollection<LauncherItem> Items { get; } = new();
+
+    /// <summary>The user's web tiles, live. The links dialog edits this collection directly.</summary>
+    public ObservableCollection<LauncherLink> Links { get; }
 
     /// <summary>The icon's colour, opacity and size. Shared with the overview dialog, which is
     /// where they are changed.</summary>
@@ -124,6 +153,46 @@ public sealed partial class LauncherViewModel : ObservableObject
 
         _settings.Save(LauncherSettings.DefaultPath);
         Application.Current.Shutdown();
+    }
+
+    /// <summary>
+    /// Opens the links editor. Closing it rebuilds the ring, because adding or removing a tile
+    /// moves every other tile.
+    /// </summary>
+    [RelayCommand]
+    public void ShowLinks()
+    {
+        CollapseNowRequested?.Invoke(this, EventArgs.Empty);
+
+        if (_links is not null)
+        {
+            _links.Activate();
+            return;
+        }
+
+        _links = new LinksDialog(new LinksViewModel(Links));
+        _links.Closed += (_, _) =>
+        {
+            _links = null;
+            _settings.Links = Links.ToList();
+            _settings.Save(LauncherSettings.DefaultPath);
+            RebuildItems();
+        };
+        _links.Show();
+    }
+
+    private void OpenLink(LauncherLink link)
+    {
+        CollapseNowRequested?.Invoke(this, EventArgs.Empty);
+
+        if (string.IsNullOrWhiteSpace(link.Url))
+        {
+            _activity.Add(link.Title, "주소가 비어 있습니다");
+            return;
+        }
+
+        BrowserLauncher.OpenPopup(link.Url, link.Width, link.Height);
+        _activity.Add(link.Title, "열기");
     }
 
     private void Open(IFeatureModule module)
