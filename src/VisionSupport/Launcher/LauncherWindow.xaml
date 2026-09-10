@@ -141,7 +141,7 @@
 
     <!-- Background is {x:Null}, not Transparent: a null background is not hit-testable, so
          clicks in the empty area around the icon reach whatever is behind the launcher. -->
-    <Grid Background="{x:Null}">
+    <Grid x:Name="LauncherRoot" Background="{x:Null}">
 
         <!-- Cached as a bitmap for the open/close animation. A transparent window renders in
              software, and scaling four tiles - each with a drop shadow, a vector icon and a
@@ -197,6 +197,67 @@
                 </DataTemplate>
             </ItemsControl.ItemTemplate>
         </ItemsControl>
+
+        <!-- The folder list. A Popup rather than a panel inside the window: it can extend past
+             the window's edge, so the launcher does not have to grow a wing to hold it, and it
+             dismisses itself when something else is clicked. -->
+        <!-- HorizontalOffset is set when the list opens: it has to clear the ring, and the ring's
+             radius follows the tile and icon sizes the user chose. -->
+        <Popup x:Name="FolderList" PlacementTarget="{Binding ElementName=Fab}" Placement="Left"
+               AllowsTransparency="True" StaysOpen="False" PopupAnimation="Fade">
+            <!-- The list wears the launcher's own colour: same hue on the rim, same hue behind
+                 a row under the pointer. A neutral grey panel next to a coloured ring reads as a
+                 different program's menu. -->
+            <Border Background="{StaticResource Panel}" BorderThickness="2"
+                    BorderBrush="{Binding DataContext.Appearance.IconEdgeBrush,
+                                 ElementName=LauncherRoot}"
+                    CornerRadius="{StaticResource RadiusCard}"
+                    Padding="6" MaxHeight="420">
+                <ItemsControl ItemsSource="{Binding FolderLinks}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <!-- Not focusable: a focusable button inside the popup pulls focus
+                                 off the launcher window, which deactivates it and folds the
+                                 menu away underneath the list being read. -->
+                            <Button MinWidth="180" Margin="0,0,0,2" Focusable="False"
+                                    ToolTip="{Binding Url}"
+                                    Command="{Binding DataContext.OpenFolderCommand,
+                                             ElementName=LauncherRoot}"
+                                    CommandParameter="{Binding}">
+                                <Button.Template>
+                                    <ControlTemplate TargetType="Button">
+                                        <Grid>
+                                            <Rectangle x:Name="Hover" RadiusX="10" RadiusY="10"
+                                                       Opacity="0"
+                                                       Fill="{Binding DataContext.Appearance.IconBrush,
+                                                             ElementName=LauncherRoot}"/>
+                                            <ContentPresenter Margin="10,7"
+                                                              HorizontalAlignment="Left"
+                                                              VerticalAlignment="Center"/>
+                                        </Grid>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter TargetName="Hover" Property="Opacity" Value="1"/>
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </Button.Template>
+
+                                <StackPanel Orientation="Horizontal">
+                                    <icons:PackIconMaterial Kind="{Binding Glyph}" Width="15"
+                                                            Height="15" Margin="0,0,9,0"
+                                                            VerticalAlignment="Center"
+                                                            Foreground="{Binding DataContext.Appearance.IconEdgeBrush,
+                                                                        ElementName=LauncherRoot}"/>
+                                    <TextBlock Text="{Binding Title}" FontSize="12"
+                                               HorizontalAlignment="Left"/>
+                                </StackPanel>
+                            </Button>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </Border>
+        </Popup>
 
         <Grid x:Name="Fab" Background="{x:Null}"
               Width="{Binding Appearance.IconSize}" Height="{Binding Appearance.IconSize}"

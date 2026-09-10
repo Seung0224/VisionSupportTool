@@ -46,12 +46,15 @@ public sealed partial class LauncherViewModel : ObservableObject
             _activity.Add(module.Title, "준비됨");
         }
 
-        Links = new ObservableCollection<LauncherLink>(settings.Links ?? LauncherLink.Defaults());
+        List<LauncherLink> saved = settings.Links ?? LauncherLink.Defaults();
+        WebLinks = new ObservableCollection<LauncherLink>(saved.Where(l => l.Kind == LinkKind.Web));
+        FolderLinks = new ObservableCollection<LauncherLink>(saved.Where(l => l.Kind == LinkKind.Folder));
 
         // Rebuild as soon as a link is added or removed, not when the editor is closed. Adding a
         // tile and finding the menu unchanged reads as "it did not work", and the editor is
         // modeless - there is no moment where the user has agreed to be finished.
-        Links.CollectionChanged += (_, _) => RebuildItems();
+        WebLinks.CollectionChanged += (_, _) => RebuildItems();
+        FolderLinks.CollectionChanged += (_, _) => RebuildItems();
 
         // Both sizes move the ring: the tile's directly, the icon's through the clearance the
         // ring keeps from it.
@@ -76,8 +79,11 @@ public sealed partial class LauncherViewModel : ObservableObject
     {
         Items.Clear();
 
+        // Web links get a tile each; folders share one, because a dozen of them would crowd the
+        // ring out of usefulness. The folder tile opens a list of its own instead.
+        bool hasFolders = FolderLinks.Count > 0;
         Point[] offsets = RadialLayout.Offsets(
-            _modules.Count + Links.Count + 1, Appearance.MenuRadius);
+            _modules.Count + WebLinks.Count + (hasFolders ? 1 : 0) + 1, Appearance.MenuRadius);
 
         // A tile is the whole item now, so both axes centre on the tile.
         double centre = Appearance.MenuSize / 2 - Appearance.TileSize / 2;
@@ -93,12 +99,20 @@ public sealed partial class LauncherViewModel : ObservableObject
                 centreX + at.X, centreY + at.Y, () => Open(module), module));
         }
 
-        foreach (LauncherLink link in Links)
+        foreach (LauncherLink link in WebLinks)
         {
             LauncherLink captured = link;
             Point at = offsets[slot++];
             Items.Add(new LauncherItem(captured.Glyph, captured.Title,
-                centreX + at.X, centreY + at.Y, () => OpenLink(captured)));
+                centreX + at.X, centreY + at.Y, () => OpenWebLink(captured)));
+        }
+
+        if (hasFolders)
+        {
+            Point at = offsets[slot++];
+            Items.Add(new LauncherItem("FolderMultipleOutline", "폴더",
+                centreX + at.X, centreY + at.Y,
+                () => FolderListRequested?.Invoke(this, EventArgs.Empty)));
         }
 
         Point last = offsets[slot];
@@ -108,8 +122,18 @@ public sealed partial class LauncherViewModel : ObservableObject
 
     public ObservableCollection<LauncherItem> Items { get; } = new();
 
-    /// <summary>The user's web tiles, live. The links dialog edits this collection directly.</summary>
-    public ObservableCollection<LauncherLink> Links { get; }
+    /// <summary>Tiles that open a page. One each, on the ring.</summary>
+    public ObservableCollection<LauncherLink> WebLinks { get; }
+
+    /// <summary>
+    /// Folders. These share a single tile: clicking it lists them beside the menu, and the list
+    /// is where one gets picked. A ring with a dozen folders on it would have no room for
+    /// anything else.
+    /// </summary>
+    public ObservableCollection<LauncherLink> FolderLinks { get; }
+
+    /// <summary>Raised when the folder tile is pressed, for the window to show the list.</summary>
+    public event EventHandler? FolderListRequested;
 
     /// <summary>The icon's colour, opacity and size. Shared with the overview dialog, which is
     /// where they are changed.</summary>
@@ -177,11 +201,11 @@ public sealed partial class LauncherViewModel : ObservableObject
             return;
         }
 
-        _links = new LinksDialog(new LinksViewModel(Links));
+        _links = new LinksDialog(new LinksViewModel(WebLinks, FolderLinks));
         _links.Closed += (_, _) =>
         {
             _links = null;
-            _settings.Links = Links.ToList();
+            _settings.Links = WebLinks.Concat(FolderLinks).ToList();
             _settings.Save(LauncherSettings.DefaultPath);
             RebuildItems();
         };
@@ -196,23 +220,27 @@ public sealed partial class LauncherViewModel : ObservableObject
     /// that long right after the click - which is the moment the user is watching it. The work is
     /// handed to the pool and only the log line comes back.
     /// </summary>
-    private async void OpenLink(LauncherLink link)
+    [RelayCommand]
+    private async Task OpenFolder(LauncherLink? link)
     {
+        if (link is null) return;
+
         CollapseNowRequested?.Invoke(this, EventArgs.Empty);
 
-        if (link.Kind == LinkKind.Folder)
-        {
-            string path = link.Url;
-            FolderLauncher.Result opened = await Task.Run(() => FolderLauncher.Open(path));
+        string path = link.Url;
+        FolderLauncher.Result opened = await Task.Run(() => FolderLauncher.Open(path));
 
-            _activity.Add(link.Title, opened switch
-            {
-                FolderLauncher.Result.Opened => "폴더 열기",
-                FolderLauncher.Result.Missing => $"폴더를 찾을 수 없습니다 — {path}",
-                _ => "폴더 열기 실패",
-            });
-            return;
-        }
+        _activity.Add(link.Title, opened switch
+        {
+            FolderLauncher.Result.Opened => "폴더 열기",
+            FolderLauncher.Result.Missing => $"폴더를 찾을 수 없습니다 — {path}",
+            _ => "폴더 열기 실패",
+        });
+    }
+
+    private async void OpenWebLink(LauncherLink link)
+    {
+        CollapseNowRequested?.Invoke(this, EventArgs.Empty);
 
         if (string.IsNullOrWhiteSpace(link.Url))
         {

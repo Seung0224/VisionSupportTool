@@ -44,6 +44,10 @@ public partial class LauncherWindow : Window
     /// </summary>
     private int _animationToken;
 
+    /// <summary>When the folder list last shut itself, so a press that caused that is not read
+    /// as a press asking for it back.</summary>
+    private DateTime _folderListClosedAt;
+
     public LauncherWindow(LauncherViewModel viewModel, LauncherSettings settings)
     {
         InitializeComponent();
@@ -85,7 +89,18 @@ public partial class LauncherWindow : Window
         // menu that has no dismiss button.
         Deactivated += (_, _) => Collapse();
 
-        viewModel.CollapseNowRequested += (_, _) => Collapse(animate: false);
+        FolderList.Closed += (_, _) => _folderListClosedAt = DateTime.UtcNow;
+
+        viewModel.CollapseNowRequested += (_, _) =>
+        {
+            FolderList.IsOpen = false;
+            Collapse(animate: false);
+        };
+
+        // The folder tile opens its list beside the menu and leaves the menu up: picking a
+        // folder is a second step, and closing the ring underneath would make it look like the
+        // click had already done something.
+        viewModel.FolderListRequested += (_, _) => ToggleFolderList();
 
         viewModel.PropertyChanged += (_, e) =>
         {
@@ -120,6 +135,37 @@ public partial class LauncherWindow : Window
         };
 
     private void ReleaseMenuBitmap() => Menu.CacheMode = null;
+
+    /// <summary>
+    /// Opens the folder list clear of the ring, or shuts it if it is already up.
+    ///
+    /// The popup is placed against the centre icon, which is the only element that stays put, so
+    /// the offset has to carry it past the tiles: out to the ring, plus half a tile for the one
+    /// sitting at nine o'clock, less the half icon the placement already skipped, plus a gap.
+    /// Negative because it goes to the left, and all three sizes are settings the user can move,
+    /// so it is worked out each time rather than written into the markup.
+    ///
+    /// The guard is what makes a second press on the tile close the list. The popup does not
+    /// stay open when something else is clicked, so by the time the tile's click arrives the
+    /// popup has already shut itself and reopening would look like the press did nothing.
+    /// </summary>
+    private void ToggleFolderList()
+    {
+        if (FolderList.IsOpen)
+        {
+            FolderList.IsOpen = false;
+            return;
+        }
+
+        if ((DateTime.UtcNow - _folderListClosedAt).TotalMilliseconds < 250) return;
+
+        LauncherAppearance look = ViewModel.Appearance;
+
+        FolderList.HorizontalOffset =
+            -(look.MenuRadius + look.TileSize / 2 - look.IconSize / 2 + 20);
+
+        FolderList.IsOpen = true;
+    }
 
     private void OnFabPressed(object sender, MouseButtonEventArgs e)
     {
@@ -197,6 +243,7 @@ public partial class LauncherWindow : Window
 
         _menuOpen = false;
         ViewModel.IsExpanded = false;
+        FolderList.IsOpen = false;
         int token = ++_animationToken;
 
         if (animate)
