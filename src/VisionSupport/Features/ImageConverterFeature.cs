@@ -27,7 +27,7 @@ public sealed class ImageConverterFeature : FeatureModule
     public override string Description
         => "bmp·png·jpg·tiff·코그넥스 idb 등을 상호 변환합니다. 압축률·리사이즈·그레이스케일 설정과 드래그앤드롭 일괄 변환을 지원합니다.";
 
-    public override string Glyph => "";
+    public override string Glyph => "ImageMultipleOutline";
 
     public override Size PreferredWindowSize => new(980, 700);
 

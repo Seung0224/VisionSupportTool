@@ -45,7 +45,14 @@ public interface IFeatureModule
     /// </summary>
     UserControl GetOrCreateView();
 
-    /// <summary>Radial menu tile icon. One Segoe MDL2 Assets character.</summary>
+    /// <summary>
+    /// Radial menu tile icon: the name of a Material Design icon, as spelled by
+    /// MahApps.Metro.IconPacks (PackIconMaterialKind) - "Memory", "ServerNetwork" and so on.
+    ///
+    /// A name rather than the enum itself so a feature never has to reference the icon package.
+    /// The binding resolves it; a name that does not exist leaves the tile blank rather than
+    /// throwing, so LauncherIconTests checks every one of them.
+    /// </summary>
     string Glyph { get; }
 
     /// <summary>Opening size of this feature's window.</summary>

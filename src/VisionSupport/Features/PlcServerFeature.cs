@@ -27,7 +27,7 @@ public sealed class PlcServerFeature : FeatureModule
     public override string Description
         => "MC · MC-TCP · OPC UA · ADS 가상 PLC 서버와 시나리오 엔진. VISION이 붙을 상대를 대신합니다.";
 
-    public override string Glyph => "";
+    public override string Glyph => "ServerNetwork";
 
     public override Size PreferredWindowSize => new(1180, 760);
 

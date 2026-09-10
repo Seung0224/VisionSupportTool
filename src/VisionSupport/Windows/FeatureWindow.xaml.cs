@@ -71,11 +71,17 @@ public partial class FeatureWindow : Window
     /// dropped and the work carries on in the background, visible on the launcher's ring and
     /// stoppable from the overview dialog.
     ///
-    /// The dance with the two flags is the one the old shell window needed too: awaiting the
-    /// teardown synchronously deadlocks, because the stop path marshals state changes back to
-    /// the UI thread that would be blocked waiting. So the close is cancelled, the teardown is
-    /// genuinely awaited, and the window is closed afterwards - and a second Alt+F4 arriving
-    /// during that wait must not start the whole thing again.
+    /// The dance with the flags is the one the old shell window needed too: awaiting the teardown
+    /// synchronously deadlocks, because the stop path marshals state changes back to the UI
+    /// thread that would be blocked waiting. So the close is cancelled, the teardown is genuinely
+    /// awaited, and the window is closed afterwards - and a second Alt+F4 arriving during that
+    /// wait must not start the whole thing again.
+    ///
+    /// The re-issued close has to go through the dispatcher rather than being called here.
+    /// ReleaseView is synchronous and StopAsync usually finishes inline, so the await often does
+    /// not yield at all - and a Close() raised from inside a Closing handler is re-entrant, which
+    /// WPF drops while keeping this pass's Cancel. The window would stay open and take a second
+    /// click on the X. Handing it to a later dispatcher turn lets this one unwind first.
     /// </summary>
     private async void OnClosing(object? sender, CancelEventArgs e)
     {
@@ -95,7 +101,7 @@ public partial class FeatureWindow : Window
         }
 
         _readyToClose = true;
-        Close();
+        await Dispatcher.BeginInvoke(Close);
     }
 
     private void OnModuleChanged(object? sender, EventArgs e)

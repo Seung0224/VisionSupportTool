@@ -36,7 +36,7 @@ public abstract class FeatureModule : IFeatureModule
 
     public virtual string StatusLine => string.Empty;
 
-    public virtual string Glyph => "";
+    public virtual string Glyph => "None";
 
     public virtual Size PreferredWindowSize => new(1100, 720);
 

@@ -8,10 +8,15 @@ namespace VisionSupport.Launcher;
 /// <summary>
 /// The floating icon. The only thing on screen when nothing is being used.
 ///
-/// The window grows from 72x72 to 340x340 while the menu is open and shrinks back afterwards. A
-/// permanently 340-wide topmost window would sit invisibly over a corner of the desktop; clicks
+/// The window grows from 72x72 to 360x360 while the menu is open and shrinks back afterwards. A
+/// permanently 360-wide topmost window would sit invisibly over a corner of the desktop; clicks
 /// pass through its empty area, but OLE drag-and-drop targeting is less forgiving, and the image
 /// converter accepts dropped files. Keeping the big window short-lived removes that question.
+///
+/// The window resize itself is invisible - the window is transparent - so all the motion the user
+/// sees comes from the storyboards here. Both directions are animated: the tiles fly out of the
+/// icon with a slight overshoot, and fly back into it before the window shrinks. Shrinking the
+/// window first would make them vanish mid-flight.
 /// </summary>
 public partial class LauncherWindow : Window
 {
@@ -20,12 +25,22 @@ public partial class LauncherWindow : Window
     /// <summary>How far the pointer has to move before a press counts as a drag, not a click.</summary>
     private const double DragThreshold = 4;
 
+    /// <summary>Where the menu starts from and returns to: small, centred on the icon.</summary>
+    private const double FoldedScale = 0.35;
+
     private readonly LauncherSettings _settings;
 
     private Point _pressOrigin;
     private Point _pressWindowOrigin;
     private bool _pressed;
     private bool _dragged;
+    private bool _menuOpen;
+
+    /// <summary>
+    /// Invalidates the completion handler of a run that has been overtaken. Without it, expanding
+    /// during a collapse would let the collapse's handler shrink the window under the new menu.
+    /// </summary>
+    private int _animationToken;
 
     public LauncherWindow(LauncherViewModel viewModel, LauncherSettings settings)
     {
@@ -40,6 +55,8 @@ public partial class LauncherWindow : Window
         Fab.MouseLeftButtonDown += OnFabPressed;
         Fab.MouseMove += OnFabMoved;
         Fab.MouseLeftButtonUp += OnFabReleased;
+        Fab.MouseEnter += (_, _) => AnimateFabZoom(1.07);
+        Fab.MouseLeave += (_, _) => AnimateFabZoom(1.0);
 
         OverviewMenuItem.Click += (_, _) => viewModel.ShowOverview();
         ExitMenuItem.Click += async (_, _) => await viewModel.ExitAsync();
@@ -103,28 +120,84 @@ public partial class LauncherWindow : Window
             return;
         }
 
-        if (ViewModel.IsExpanded) Collapse();
+        if (_menuOpen) Collapse();
         else Expand();
     }
 
     private void Expand()
     {
+        if (_menuOpen) return;
+
+        _menuOpen = true;
+        _animationToken++;
+        ViewModel.IsExpanded = true;
+
         Resize(LauncherViewModel.ExpandedSize);
         NudgeOntoScreen();
 
         Menu.Visibility = Visibility.Visible;
-        Animate(0.6, 1.0);
-        ViewModel.IsExpanded = true;
+
+        // A little overshoot on the way out is what makes it read as "sprung open" rather than
+        // "resized". Coming back in it eases straight, because an overshoot on the way to nothing
+        // just looks like a stutter.
+        AnimateMenu(1.0, 1.0, new BackEase { EasingMode = EasingMode.EaseOut, Amplitude = 0.45 },
+                    260, onDone: null);
+        AnimateFabAngle(180);
     }
 
     private void Collapse()
     {
-        if (!ViewModel.IsExpanded && Menu.Visibility == Visibility.Collapsed) return;
+        if (!_menuOpen) return;
 
+        _menuOpen = false;
         ViewModel.IsExpanded = false;
-        Menu.Visibility = Visibility.Collapsed;
-        Resize(CollapsedSize);
-        RememberPosition();
+
+        int token = ++_animationToken;
+        AnimateMenu(FoldedScale, 0.0, new CubicEase { EasingMode = EasingMode.EaseIn }, 170, () =>
+        {
+            if (token != _animationToken) return;
+
+            Menu.Visibility = Visibility.Collapsed;
+            Resize(CollapsedSize);
+            RememberPosition();
+        });
+        AnimateFabAngle(0);
+    }
+
+    private void AnimateMenu(double scale, double opacity, IEasingFunction ease, int milliseconds,
+                             Action? onDone)
+    {
+        var duration = new Duration(TimeSpan.FromMilliseconds(milliseconds));
+
+        // Separate instances per property: one Timeline started twice raises Completed twice.
+        var scaleX = new DoubleAnimation(scale, duration) { EasingFunction = ease };
+        var scaleY = new DoubleAnimation(scale, duration) { EasingFunction = ease };
+        var fade = new DoubleAnimation(opacity,
+            new Duration(TimeSpan.FromMilliseconds(milliseconds * 0.75)));
+
+        if (onDone is not null) scaleX.Completed += (_, _) => onDone();
+
+        MenuScale.BeginAnimation(ScaleTransform.ScaleXProperty, scaleX);
+        MenuScale.BeginAnimation(ScaleTransform.ScaleYProperty, scaleY);
+        Menu.BeginAnimation(OpacityProperty, fade);
+    }
+
+    private void AnimateFabAngle(double angle)
+        => FabRotate.BeginAnimation(RotateTransform.AngleProperty,
+            new DoubleAnimation(angle, new Duration(TimeSpan.FromMilliseconds(220)))
+            {
+                EasingFunction = new CubicEase { EasingMode = EasingMode.EaseInOut },
+            });
+
+    private void AnimateFabZoom(double scale)
+    {
+        var duration = new Duration(TimeSpan.FromMilliseconds(130));
+        var ease = new CubicEase { EasingMode = EasingMode.EaseOut };
+
+        FabZoom.BeginAnimation(ScaleTransform.ScaleXProperty,
+            new DoubleAnimation(scale, duration) { EasingFunction = ease });
+        FabZoom.BeginAnimation(ScaleTransform.ScaleYProperty,
+            new DoubleAnimation(scale, duration) { EasingFunction = ease });
     }
 
     /// <summary>Resizes around the icon's centre, so growing the window does not move the icon.</summary>
@@ -152,17 +225,6 @@ public partial class LauncherWindow : Window
 
         Left = Math.Clamp(Left, minLeft, Math.Max(minLeft, maxLeft));
         Top = Math.Clamp(Top, minTop, Math.Max(minTop, maxTop));
-    }
-
-    private void Animate(double from, double to)
-    {
-        var scale = new DoubleAnimation(from, to, TimeSpan.FromMilliseconds(120))
-        {
-            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut },
-        };
-
-        MenuScale.BeginAnimation(ScaleTransform.ScaleXProperty, scale);
-        MenuScale.BeginAnimation(ScaleTransform.ScaleYProperty, scale);
     }
 
     private void RememberPosition()

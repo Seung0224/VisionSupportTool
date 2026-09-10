@@ -18,12 +18,16 @@ namespace VisionSupport.Launcher;
 /// </summary>
 public sealed partial class LauncherViewModel : ObservableObject
 {
-    /// <summary>Tile size and menu radius. The expanded window is sized to fit these.</summary>
+    /// <summary>The round-square button itself.</summary>
     public const double TileSize = 56;
 
-    public const double MenuRadius = 110;
+    /// <summary>The tile plus the label under it. Wider than the tile, so the label can breathe.</summary>
+    public const double ItemWidth = 88;
 
-    public const double ExpandedSize = 340;
+    public const double MenuRadius = 112;
+
+    /// <summary>Big enough that a tile at the far edge of the circle, label and all, still fits.</summary>
+    public const double ExpandedSize = 360;
 
     private readonly IReadOnlyList<IFeatureModule> _modules;
     private readonly ActivityLog _activity;
@@ -45,13 +49,17 @@ public sealed partial class LauncherViewModel : ObservableObject
         _startedAt = startedAt;
 
         Point[] offsets = RadialLayout.Offsets(modules.Count + 1, MenuRadius);
-        double centre = ExpandedSize / 2 - TileSize / 2;
+
+        // The tile sits on the circle; the label hangs below it. So the item is centred
+        // horizontally on its own width but vertically on the tile's, not the item's.
+        double centreX = ExpandedSize / 2 - ItemWidth / 2;
+        double centreY = ExpandedSize / 2 - TileSize / 2;
 
         for (int i = 0; i < modules.Count; i++)
         {
             IFeatureModule module = modules[i];
             Items.Add(new LauncherItem(module.Glyph, module.Title,
-                centre + offsets[i].X, centre + offsets[i].Y,
+                centreX + offsets[i].X, centreY + offsets[i].Y,
                 () => Open(module), module));
 
             module.Changed += OnModuleChanged;
@@ -59,8 +67,8 @@ public sealed partial class LauncherViewModel : ObservableObject
         }
 
         Point last = offsets[^1];
-        Items.Add(new LauncherItem("", "전체보기",
-            centre + last.X, centre + last.Y, ShowOverview));
+        Items.Add(new LauncherItem("ViewDashboardOutline", "전체보기",
+            centreX + last.X, centreY + last.Y, ShowOverview));
     }
 
     public ObservableCollection<LauncherItem> Items { get; } = new();
