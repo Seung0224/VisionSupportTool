@@ -87,7 +87,6 @@ public sealed partial class LauncherAppearance : ObservableObject
             _settings.TileSize = clamped;
             OnPropertyChanged();
             OnPropertyChanged(nameof(TileIconSize));
-            OnPropertyChanged(nameof(ItemWidth));
             OnPropertyChanged(nameof(MenuRadius));
             OnPropertyChanged(nameof(MenuSize));
         }
@@ -95,13 +94,6 @@ public sealed partial class LauncherAppearance : ObservableObject
 
     /// <summary>The vector icon inside a tile.</summary>
     public double TileIconSize => Math.Round(TileSize * 0.43);
-
-    /// <summary>
-    /// A tile plus the room its label needs beside it. Wider than the tile, because the label is
-    /// what decides how close two neighbours can sit - and labels do not wrap, so the slot has to
-    /// be the thing that is wide enough.
-    /// </summary>
-    public double ItemWidth => Math.Round(TileSize * 1.75);
 
     /// <summary>
     /// The ring the tiles sit on.
@@ -117,10 +109,10 @@ public sealed partial class LauncherAppearance : ObservableObject
     /// How big the launcher window grows to hold the open menu: the ring, plus half an item on
     /// each side, plus room for the labels.
     ///
-    /// The margin covers the label under the lowest tile, which hangs below the ring and is what
-    /// the window edge would otherwise cut through.
+    /// Nothing hangs below a tile any more, so the margin is only breathing room - enough that a
+    /// tile at its hover size is not clipped by the window edge.
     /// </summary>
-    public double MenuSize => Math.Round((MenuRadius + ItemWidth / 2) * 2 + 64);
+    public double MenuSize => Math.Round((MenuRadius + TileSize / 2) * 2 + 32);
 
     /// <summary>The icon's fill. Frozen: it is rebuilt on every hue change and read from the
     /// render thread.</summary>

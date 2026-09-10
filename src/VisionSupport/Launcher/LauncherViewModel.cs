@@ -74,10 +74,10 @@ public sealed partial class LauncherViewModel : ObservableObject
         Point[] offsets = RadialLayout.Offsets(
             _modules.Count + Links.Count + 1, Appearance.MenuRadius);
 
-        // The tile sits on the circle; the label hangs below it. So the item is centred
-        // horizontally on its own width but vertically on the tile's, not the item's.
-        double centreX = Appearance.MenuSize / 2 - Appearance.ItemWidth / 2;
-        double centreY = Appearance.MenuSize / 2 - Appearance.TileSize / 2;
+        // A tile is the whole item now, so both axes centre on the tile.
+        double centre = Appearance.MenuSize / 2 - Appearance.TileSize / 2;
+        double centreX = centre;
+        double centreY = centre;
 
         int slot = 0;
 

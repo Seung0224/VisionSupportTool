@@ -169,41 +169,31 @@
             </ItemsControl.ItemContainerStyle>
             <ItemsControl.ItemTemplate>
                 <DataTemplate>
-                    <StackPanel HorizontalAlignment="Center"
-                                Width="{Binding DataContext.Appearance.ItemWidth,
-                                       RelativeSource={RelativeSource AncestorType=Window}}">
-                        <!-- Tiles wear the same hue as the icon that opened them, so the colour
-                             slider moves the whole launcher rather than just the circle. -->
-                        <Button Style="{StaticResource MenuTile}"
-                                Command="{Binding ActivateCommand}"
-                                HorizontalAlignment="Center"
-                                Width="{Binding DataContext.Appearance.TileSize,
-                                       RelativeSource={RelativeSource AncestorType=Window}}"
-                                Height="{Binding DataContext.Appearance.TileSize,
-                                        RelativeSource={RelativeSource AncestorType=Window}}"
-                                Background="{Binding DataContext.Appearance.IconBrush,
-                                            RelativeSource={RelativeSource AncestorType=Window}}"
-                                BorderBrush="{Binding DataContext.Appearance.IconEdgeBrush,
-                                             RelativeSource={RelativeSource AncestorType=Window}}">
-                            <icons:PackIconMaterial Kind="{Binding Glyph}" Foreground="White"
-                                Width="{Binding DataContext.Appearance.TileIconSize,
-                                       RelativeSource={RelativeSource AncestorType=Window}}"
-                                Height="{Binding DataContext.Appearance.TileIconSize,
-                                        RelativeSource={RelativeSource AncestorType=Window}}"/>
-                        </Button>
+                    <!-- The tile is the whole item. Names live in the tooltip rather than under
+                         each tile: a caption pinned to a floating widget has to carry its own
+                         background to stay readable over an unknown desktop, and a row of little
+                         dark pills around the ring was more furniture than the four words were
+                         worth. The icons carry the meaning; the tooltip settles any doubt.
 
-                        <!-- The label carries its own dark pill: the desktop behind the launcher
-                             can be any colour, and bare text on it is unreadable half the time. -->
-                        <Border Margin="0,7,0,0" HorizontalAlignment="Center"
-                                CornerRadius="{StaticResource RadiusPill}"
-                                Background="#E61A1A1A" Padding="9,3">
-                            <!-- One line, sized to the text. The slot around it (ItemWidth) is
-                                 wide enough for the longest label, so nothing has to wrap and
-                                 nothing runs off the window. -->
-                            <TextBlock Text="{Binding Title}" FontSize="11"
-                                       Foreground="{StaticResource Fg}"/>
-                        </Border>
-                    </StackPanel>
+                         Tiles wear the same hue as the icon that opened them, so the colour
+                         slider moves the whole launcher rather than just the circle. -->
+                    <Button Style="{StaticResource MenuTile}"
+                            Command="{Binding ActivateCommand}" ToolTip="{Binding Title}"
+                            HorizontalAlignment="Center"
+                            Width="{Binding DataContext.Appearance.TileSize,
+                                   RelativeSource={RelativeSource AncestorType=Window}}"
+                            Height="{Binding DataContext.Appearance.TileSize,
+                                    RelativeSource={RelativeSource AncestorType=Window}}"
+                            Background="{Binding DataContext.Appearance.IconBrush,
+                                        RelativeSource={RelativeSource AncestorType=Window}}"
+                            BorderBrush="{Binding DataContext.Appearance.IconEdgeBrush,
+                                         RelativeSource={RelativeSource AncestorType=Window}}">
+                        <icons:PackIconMaterial Kind="{Binding Glyph}" Foreground="White"
+                            Width="{Binding DataContext.Appearance.TileIconSize,
+                                   RelativeSource={RelativeSource AncestorType=Window}}"
+                            Height="{Binding DataContext.Appearance.TileIconSize,
+                                    RelativeSource={RelativeSource AncestorType=Window}}"/>
+                    </Button>
                 </DataTemplate>
             </ItemsControl.ItemTemplate>
         </ItemsControl>
