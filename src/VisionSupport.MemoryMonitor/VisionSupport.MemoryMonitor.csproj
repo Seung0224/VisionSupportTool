@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <!-- ClrMD's live attach reads the target's address space directly, so the reader must
+         match the target's bitness. Pinning x64 makes the constraint explicit: this build
+         attaches to x64 targets only. -->
+    <PlatformTarget>x64</PlatformTarget>
+    <AssemblyName>VisionSupport.MemoryMonitor</AssemblyName>
+    <!-- Namespaces stay MemMon.*: nothing outside this assembly names them, and renaming would
+         bury the real changes in noise. -->
+    <RootNamespace>MemMon</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
+    <PackageReference Include="Microsoft.Diagnostics.Runtime" Version="4.0.732401" />
+    <!-- ETW session for GC pause times. Only the GC keyword is ever enabled: a handful of
+         events per collection, unlike the allocation or stack keywords. -->
+    <PackageReference Include="Microsoft.Diagnostics.Tracing.TraceEvent" Version="3.2.6" />
+    <PackageReference Include="ScottPlot.WPF" Version="5.1.59" />
+  </ItemGroup>
+
+</Project>

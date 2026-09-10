@@ -1,0 +1,709 @@
+<!--
+    Was MemMon's MainWindow; now a page hosted in the support shell. Only the outer element
+    changed - the window chrome, size and title belong to the shell, everything inside is the
+    monitor exactly as it was.
+-->
+<UserControl x:Class="MemMon.MonitorView"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:MemMon"
+        xmlns:sp="clr-namespace:ScottPlot.WPF;assembly=ScottPlot.WPF"
+        Background="{StaticResource Bg}"
+        TextOptions.TextFormattingMode="Display"
+        ToolTipService.ShowDuration="30000" ToolTipService.InitialShowDelay="350">
+
+    <UserControl.Resources>
+        <local:BytesConverter x:Key="Bytes"/>
+        <local:SignedBytesConverter x:Key="SignedBytes"/>
+        <local:SignedCountConverter x:Key="SignedCount"/>
+        <local:DeltaBrushConverter x:Key="DeltaBrush"/>
+        <local:BoolToVisibilityConverter x:Key="BoolToVis"/>
+        <local:InverseBoolToVisibilityConverter x:Key="NotBoolToVis"/>
+        <local:PauseBrushConverter x:Key="PauseBrush"/>
+        <local:AnomalyReasonConverter x:Key="AnomalyReason"/>
+        <local:ZeroToVisibilityConverter x:Key="ZeroToVis"/>
+
+        <!-- A self-contained horizontal scrollbar for panning the chart's time window. It does
+             NOT derive from the app-wide ScrollBar style, whose Width=12 setter (meant for
+             vertical bars, undone there by an Orientation trigger this template would not carry)
+             collapses a horizontal bar to a 12 px stub. OverridesDefaultStyle keeps that setter
+             out; the Track binds ViewportSize so the thumb shows how much history is in view. -->
+        <Style x:Key="TimeScrollPageButton" TargetType="RepeatButton">
+            <Setter Property="OverridesDefaultStyle" Value="True"/>
+            <Setter Property="Focusable" Value="False"/>
+            <Setter Property="IsTabStop" Value="False"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RepeatButton">
+                        <Border Background="Transparent"/>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="TimeScrollThumb" TargetType="Thumb">
+            <Setter Property="OverridesDefaultStyle" Value="True"/>
+            <Setter Property="MinWidth" Value="28"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Thumb">
+                        <Border x:Name="Chrome" Background="#FF5A5A5A" CornerRadius="3" Margin="0,2"/>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Chrome" Property="Background" Value="#FF7A7A7A"/>
+                            </Trigger>
+                            <Trigger Property="IsDragging" Value="True">
+                                <Setter TargetName="Chrome" Property="Background" Value="#FF8A8A8A"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="TimeScrollBarStyle" TargetType="ScrollBar">
+            <Setter Property="OverridesDefaultStyle" Value="True"/>
+            <Setter Property="Height" Value="14"/>
+            <Setter Property="Focusable" Value="False"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ScrollBar">
+                        <Border Background="{StaticResource Panel}" BorderBrush="{StaticResource Border}"
+                                BorderThickness="1" CornerRadius="3">
+                            <Track x:Name="PART_Track" Orientation="Horizontal" IsDirectionReversed="False"
+                                   ViewportSize="{TemplateBinding ViewportSize}">
+                                <Track.DecreaseRepeatButton>
+                                    <RepeatButton Style="{StaticResource TimeScrollPageButton}"
+                                                  Command="ScrollBar.PageLeftCommand"/>
+                                </Track.DecreaseRepeatButton>
+                                <Track.IncreaseRepeatButton>
+                                    <RepeatButton Style="{StaticResource TimeScrollPageButton}"
+                                                  Command="ScrollBar.PageRightCommand"/>
+                                </Track.IncreaseRepeatButton>
+                                <Track.Thumb>
+                                    <Thumb Style="{StaticResource TimeScrollThumb}"/>
+                                </Track.Thumb>
+                            </Track>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.4"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </UserControl.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="2*" MinHeight="180"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="3*" MinHeight="220"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- toolbar -->
+        <Border Grid.Row="0" Background="{StaticResource Panel}" BorderBrush="{StaticResource Border}"
+                BorderThickness="0,0,0,1" Padding="12,10">
+            <StackPanel Orientation="Horizontal">
+                <TextBlock Text="대상" Foreground="{StaticResource FgDim}" Margin="0,0,8,0"/>
+                <ComboBox Width="420" ItemsSource="{Binding Processes}"
+                          SelectedItem="{Binding SelectedProcess}"
+                          DisplayMemberPath="Display"/>
+                <Button Content="새로고침" Command="{Binding RefreshProcessesCommand}" Margin="6,0,6,0"
+                        ToolTip="실행 중인 .NET 프로세스를 다시 찾습니다. 프로세스 수백 개의 모듈을 확인하므로 몇 초 걸리며, 그동안에도 창은 계속 반응합니다."/>
+
+                <!-- The scan runs off the UI thread; this is the only sign it is working. -->
+                <Grid Width="16" Height="16" Margin="0,0,8,0"
+                      Visibility="{Binding IsScanning, Converter={StaticResource BoolToVis}}">
+                    <Ellipse Width="16" Height="16" Stroke="{StaticResource Border}" StrokeThickness="2"/>
+                    <Path Stroke="#FF1F9CF0" StrokeThickness="2" StrokeStartLineCap="Round"
+                          Data="M 8,1 A 7,7 0 0 1 15,8" RenderTransformOrigin="0.5,0.5">
+                        <Path.RenderTransform>
+                            <RotateTransform Angle="0"/>
+                        </Path.RenderTransform>
+                        <Path.Triggers>
+                            <EventTrigger RoutedEvent="Loaded">
+                                <BeginStoryboard>
+                                    <Storyboard RepeatBehavior="Forever">
+                                        <DoubleAnimation Storyboard.TargetProperty="RenderTransform.Angle"
+                                                         From="0" To="360" Duration="0:0:0.9"/>
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </EventTrigger>
+                        </Path.Triggers>
+                    </Path>
+                </Grid>
+                <Button Content="감시 시작" Command="{Binding AttachCommand}"
+                        Background="{StaticResource Accent}"/>
+                <Button Content="감시 중지" Command="{Binding DetachCommand}"
+                        IsEnabled="{Binding IsAttached}"/>
+                <Rectangle Width="1" Fill="{StaticResource Border}" Margin="8,2"/>
+                <Button Content="EXE 실행 후 감시" Command="{Binding LaunchAndAttachCommand}"
+                        ToolTip="선택한 실행 파일을 띄우고 CLR이 올라오면 바로 붙습니다. MemMon이 관리자 권한으로 돌기 때문에 여기서 띄운 프로그램도 관리자 권한을 물려받습니다 - 평소와 동작이 달라질 수 있다면 그 프로그램은 따로 띄우고 목록에서 고르세요."/>
+                <Rectangle Width="1" Fill="{StaticResource Border}" Margin="8,2"/>
+                <Button Content="스냅샷 찍기" Command="{Binding TakeSnapshotCommand}"
+                        IsEnabled="{Binding IsAttached}" Background="{StaticResource Accent}"
+                        ToolTip="지금 이 순간 대상의 관리 힙에 살아있는 객체를 전부 훑어 타입별로 셉니다. 훑는 동안 대상이 잠깐 멈춥니다. 시간 간격을 두고 두 번 찍은 뒤 비교 탭에서 늘어난 타입을 찾으세요."/>
+                <Rectangle Width="1" Fill="{StaticResource Border}" Margin="8,2"/>
+                <Button Content="GC 값 설명" Click="OnShowGcReference"
+                        ToolTip="GC 일시정지 탭의 '이유'와 '유형' 열에 나오는 값이 각각 무슨 뜻인지, 어떤 값이 문제인지 표로 정리해 보여줍니다."/>
+            </StackPanel>
+        </Border>
+
+        <!-- live chart -->
+        <Grid Grid.Row="1">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <Grid Grid.Row="0">
+                <sp:WpfPlot x:Name="Chart"/>
+                <Canvas x:Name="Overlay" IsHitTestVisible="False" ClipToBounds="True">
+                    <Line x:Name="Crosshair" Stroke="#FF8A8A8A" StrokeThickness="1"
+                          StrokeDashArray="3 3" Visibility="Collapsed"/>
+                    <Border x:Name="Readout" Background="#F21E1E1E" BorderBrush="{StaticResource Border}"
+                            BorderThickness="1" CornerRadius="4" Padding="10,8" Visibility="Collapsed">
+                        <StackPanel x:Name="ReadoutPanel"/>
+                    </Border>
+                </Canvas>
+                <TextBlock x:Name="ChartHint"
+                           Text="감시를 시작하면 세대별 힙 추이가 여기에 그려집니다. 스냅샷을 찍으면 그 시점이 세로 점선으로 표시됩니다."
+                           Foreground="{StaticResource FgDim}"
+                           HorizontalAlignment="Center" VerticalAlignment="Center"/>
+
+                <!-- Window-width presets. The scrollbar below then pans this width across the
+                     retained history; picking a preset also snaps the view back to live. -->
+                <Border x:Name="ZoomBar" HorizontalAlignment="Left" VerticalAlignment="Top"
+                        Margin="58,8,0,0" Padding="4,3" CornerRadius="4" Background="#D9252526"
+                        BorderBrush="{StaticResource Border}" BorderThickness="1">
+                    <StackPanel Orientation="Horizontal">
+                        <StackPanel.Resources>
+                            <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                                <Setter Property="Padding" Value="7,2"/>
+                                <Setter Property="Margin" Value="2,0"/>
+                                <Setter Property="MinWidth" Value="0"/>
+                                <Setter Property="FontSize" Value="11"/>
+                            </Style>
+                        </StackPanel.Resources>
+                        <Button Content="5분" Tag="300" Click="OnZoomPreset"/>
+                        <Button Content="10분" Tag="600" Click="OnZoomPreset"/>
+                        <Button Content="30분" Tag="1800" Click="OnZoomPreset"/>
+                        <Button Content="1시간" Tag="3600" Click="OnZoomPreset"/>
+                        <TextBlock x:Name="SpanLabel" Foreground="{StaticResource FgDim}" FontSize="11"
+                                   VerticalAlignment="Center" Margin="8,0,6,0"/>
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+            <!-- Pans the chosen window width across the retained history (up to 12 h). Dragged
+                 fully right, the view follows the newest sample again. -->
+            <Grid Grid.Row="1" Margin="54,2,10,3" MinHeight="16">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <ScrollBar x:Name="TimeScroll" Grid.Column="0" Orientation="Horizontal"
+                           HorizontalAlignment="Stretch" VerticalAlignment="Center"
+                           Style="{StaticResource TimeScrollBarStyle}"
+                           Minimum="0" Maximum="0" Value="0" ViewportSize="1200"
+                           SmallChange="60" LargeChange="600"
+                           IsEnabled="False" Scroll="OnTimeScroll"/>
+                <TextBlock x:Name="TimeRangeLabel" Grid.Column="1" Margin="10,0,2,0"
+                           Foreground="{StaticResource FgDim}" FontSize="11"
+                           VerticalAlignment="Center" MinWidth="132" TextAlignment="Right"/>
+            </Grid>
+        </Grid>
+
+        <Border Grid.Row="2" Background="{StaticResource Panel}" BorderBrush="{StaticResource Border}"
+                BorderThickness="0,1,0,1" Padding="12,6">
+            <StackPanel Orientation="Horizontal">
+                <StackPanel.Resources>
+                    <Style TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
+                        <Setter Property="FontFamily" Value="Consolas"/>
+                        <Setter Property="FontSize" Value="12"/>
+                    </Style>
+                </StackPanel.Resources>
+
+                <TextBlock Style="{StaticResource HeaderTip}" Text="관리 힙" FontFamily="Consolas" FontSize="12"
+                           ToolTip="GC가 관리하는 힙 전체 크기입니다 (Gen0+Gen1+Gen2+LOH). 이 값이 계속 커지면 관리 객체가 쌓이고 있다는 뜻입니다."/>
+                <TextBlock Text="{Binding LiveManagedTotal}" Margin="6,0,20,0"/>
+
+                <TextBlock Style="{StaticResource HeaderTip}" Text="Gen0" FontFamily="Consolas" FontSize="12"
+                           ToolTip="0세대. 방금 만들어진 객체가 들어가는 자리입니다. 여기서 죽는 객체는 회수 비용이 거의 없습니다. 정상이라면 톱니처럼 오르내립니다."/>
+                <TextBlock Text="{Binding LiveGen0}" Margin="6,0,20,0"/>
+
+                <TextBlock Style="{StaticResource HeaderTip}" Text="Gen1" FontFamily="Consolas" FontSize="12"
+                           ToolTip="1세대. Gen0 수집에서 살아남은 객체가 옮겨오는 중간 단계입니다."/>
+                <TextBlock Text="{Binding LiveGen1}" Margin="6,0,20,0"/>
+
+                <TextBlock Style="{StaticResource HeaderTip}" Text="Gen2" FontFamily="Consolas" FontSize="12"
+                           ToolTip="2세대. 오래 살아남은 객체가 모이는 곳입니다. 여기를 청소하는 Gen2 GC가 가장 오래 걸립니다. 이 값이 계속 우상향하면 그게 바로 누수 신호입니다."/>
+                <TextBlock Text="{Binding LiveGen2}" Margin="6,0,20,0"/>
+
+                <TextBlock Style="{StaticResource HeaderTip}" Text="LOH" FontFamily="Consolas" FontSize="12"
+                           ToolTip="Large Object Heap. 85KB 이상인 큰 객체(대부분 배열, 이미지 버퍼)가 따로 들어가는 영역입니다. 기본적으로 압축되지 않아 조각화가 잘 생깁니다."/>
+                <TextBlock Text="{Binding LiveLoh}" Margin="6,0,20,0"/>
+
+                <TextBlock Style="{StaticResource HeaderTip}" Text="Private" FontFamily="Consolas" FontSize="12"
+                           ToolTip="이 프로세스가 혼자 쓰는 메모리 총량으로, 관리 힙 + 네이티브 메모리입니다. Private만 오르고 관리 힙이 평평하면 관리 힙 밖(예: VisionPro 이미지 버퍼)이 새고 있다는 뜻입니다."/>
+                <TextBlock Text="{Binding LivePrivate}" Margin="6,0,0,0"/>
+            </StackPanel>
+        </Border>
+
+        <!-- snapshot / diff tabs -->
+        <TabControl Grid.Row="3" Background="{StaticResource Bg}" BorderThickness="0"
+                    Padding="0" Margin="0,4,0,0">
+
+            <TabItem Header="스냅샷">
+                <Grid Margin="8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="300"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <DockPanel Grid.Column="0">
+                        <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Margin="0,8,0,0">
+                            <Button Content="저장" Command="{Binding SaveSnapshotCommand}" Padding="10,4"/>
+                            <Button Content="불러오기" Command="{Binding LoadSnapshotCommand}" Padding="10,4"/>
+                            <Button Content="비우기" Command="{Binding ClearSnapshotsCommand}" Padding="10,4"/>
+                        </StackPanel>
+                        <TextBlock DockPanel.Dock="Top" Text="스냅샷" Foreground="{StaticResource FgDim}"
+                                   Margin="0,0,0,6"/>
+                        <ListBox ItemsSource="{Binding Snapshots}"
+                                 SelectedItem="{Binding SelectedSnapshot}"
+                                 DisplayMemberPath="Display"/>
+                    </DockPanel>
+
+                    <GridSplitter Grid.Column="1" Width="6" Background="Transparent"
+                                  HorizontalAlignment="Center" VerticalAlignment="Stretch"/>
+
+                    <DockPanel Grid.Column="2">
+                        <TextBlock DockPanel.Dock="Top" Text="{Binding SnapshotSummary}"
+                                   FontFamily="Consolas" FontSize="12" Margin="0,0,0,6"
+                                   ToolTip="객체 = 살아있는 인스턴스 총수. 빈 공간 = 살아있는 객체 사이에 남은 빈 자리(조각화). 타입 = 서로 다른 형식의 종류 수. 수집 = 이 스냅샷을 뜨느라 대상이 멈춰 있던 시간."/>
+                        <DockPanel DockPanel.Dock="Top" Margin="0,0,0,6">
+                            <TextBlock Text="타입 필터" Foreground="{StaticResource FgDim}" Margin="0,0,8,0"/>
+                            <TextBox Text="{Binding TypeFilter, UpdateSourceTrigger=PropertyChanged, Delay=250}"/>
+                        </DockPanel>
+                        <DataGrid ItemsSource="{Binding TypeRows}">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Binding="{Binding TypeName}" Width="*">
+                                    <DataGridTextColumn.Header>
+                                        <TextBlock Style="{StaticResource HeaderTip}" Text="타입"
+                                                   ToolTip="객체의 전체 형식 이름입니다. 내 코드의 타입이든 외부 라이브러리(예: Cognex.VisionPro...)의 타입이든 구분 없이 그대로 나옵니다."/>
+                                    </DataGridTextColumn.Header>
+                                </DataGridTextColumn>
+                                <DataGridTextColumn Binding="{Binding Count, StringFormat=N0}" Width="110">
+                                    <DataGridTextColumn.Header>
+                                        <TextBlock Style="{StaticResource HeaderTip}" Text="개수"
+                                                   ToolTip="이 스냅샷 시점에 살아있는 인스턴스 수입니다. 네이티브 메모리를 감싸는 래퍼 타입은 크기보다 이 개수가 더 믿을 만한 신호입니다."/>
+                                    </DataGridTextColumn.Header>
+                                    <DataGridTextColumn.ElementStyle>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="HorizontalAlignment" Value="Right"/>
+                                        </Style>
+                                    </DataGridTextColumn.ElementStyle>
+                                </DataGridTextColumn>
+                                <DataGridTextColumn Binding="{Binding TotalBytes, Converter={StaticResource Bytes}}"
+                                                    Width="120">
+                                    <DataGridTextColumn.Header>
+                                        <TextBlock Style="{StaticResource HeaderTip}" Text="총 크기"
+                                                   ToolTip="이 타입이 차지한 관리 힙 크기입니다. 주의: 관리 힙 몫만 셉니다. VisionPro 이미지처럼 실제 데이터가 네이티브 메모리에 있으면 여기엔 껍데기 크기만 잡힙니다."/>
+                                    </DataGridTextColumn.Header>
+                                    <DataGridTextColumn.ElementStyle>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="HorizontalAlignment" Value="Right"/>
+                                        </Style>
+                                    </DataGridTextColumn.ElementStyle>
+                                </DataGridTextColumn>
+                                <DataGridTextColumn Binding="{Binding AverageBytes, StringFormat=N0}" Width="100">
+                                    <DataGridTextColumn.Header>
+                                        <TextBlock Style="{StaticResource HeaderTip}" Text="평균"
+                                                   ToolTip="인스턴스 하나당 평균 바이트(총 크기 ÷ 개수)입니다. 배열처럼 크기가 들쭉날쭉한 타입을 가늠할 때 씁니다."/>
+                                    </DataGridTextColumn.Header>
+                                    <DataGridTextColumn.ElementStyle>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="HorizontalAlignment" Value="Right"/>
+                                        </Style>
+                                    </DataGridTextColumn.ElementStyle>
+                                </DataGridTextColumn>
+                            </DataGrid.Columns>
+                        </DataGrid>
+                    </DockPanel>
+                </Grid>
+            </TabItem>
+
+            <TabItem Header="비교 (누수 찾기)">
+                <DockPanel Margin="8">
+                    <Grid DockPanel.Dock="Top" Margin="0,0,0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="240"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="이전 (A)" Foreground="{StaticResource FgDim}" Margin="0,0,8,0"
+                                   ToolTip="기준이 되는 먼저 찍은 스냅샷입니다."/>
+                        <ComboBox Grid.Column="1" ItemsSource="{Binding Snapshots}"
+                                  SelectedItem="{Binding DiffBefore}" DisplayMemberPath="Display"/>
+                        <TextBlock Grid.Column="2" Text="이후 (B)" Foreground="{StaticResource FgDim}" Margin="16,0,8,0"
+                                   ToolTip="비교 대상이 되는 나중에 찍은 스냅샷입니다. B에서 A를 뺀 값이 증감으로 나옵니다."/>
+                        <ComboBox Grid.Column="3" ItemsSource="{Binding Snapshots}"
+                                  SelectedItem="{Binding DiffAfter}" DisplayMemberPath="Display"/>
+                        <TextBlock Grid.Column="4" Text="필터" Foreground="{StaticResource FgDim}" Margin="16,0,8,0"/>
+                        <TextBox Grid.Column="5"
+                                 Text="{Binding DiffFilter, UpdateSourceTrigger=PropertyChanged, Delay=250}"/>
+                    </Grid>
+
+                    <Border DockPanel.Dock="Top" Margin="0,0,0,8" Padding="10,7" CornerRadius="4"
+                            Background="{StaticResource Panel}" BorderBrush="{StaticResource Border}"
+                            BorderThickness="1">
+                        <TextBlock Text="{Binding ComparisonSummary}" FontFamily="Consolas" FontSize="12"
+                                   TextWrapping="Wrap"
+                                   ToolTip="두 스냅샷 사이에 프로세스 메모리가 어디서 늘었는지입니다. 아래 타입 표는 관리 힙만 설명할 수 있으므로, '네이티브' 쪽이 크면 원인은 표에 없습니다 — VisionPro 이미지 버퍼처럼 관리 힙 밖에 있는 메모리입니다."/>
+                    </Border>
+
+                    <TextBlock DockPanel.Dock="Top" Margin="0,0,0,6" Foreground="{StaticResource FgDim}"
+                               TextWrapping="Wrap"
+                               Text="아래 표는 관리 힙만 설명합니다. 증가량이 큰 타입이 위에 옵니다. 네이티브 자원을 감싸는 타입(VisionPro 등)은 크기가 거의 안 늘므로 '개수 증감' 열 머리글을 두 번 눌러 개수 기준으로 정렬하세요."/>
+
+                    <DataGrid ItemsSource="{Binding DiffRows}">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Binding="{Binding TypeName}" Width="*">
+                                <DataGridTextColumn.Header>
+                                    <TextBlock Style="{StaticResource HeaderTip}" Text="타입"
+                                               ToolTip="객체의 전체 형식 이름입니다. 외부 라이브러리 타입도 그대로 나옵니다."/>
+                                </DataGridTextColumn.Header>
+                            </DataGridTextColumn>
+                            <DataGridTextColumn Binding="{Binding DeltaBytes, Converter={StaticResource SignedBytes}}"
+                                                Width="130">
+                                <DataGridTextColumn.Header>
+                                    <TextBlock Style="{StaticResource HeaderTip}" Text="크기 증감"
+                                               ToolTip="A에서 B로 오면서 이 타입이 차지한 관리 힙 크기가 얼마나 변했는지입니다. 양수(빨강)면 늘어난 것이고, 이 표는 이 값 기준 내림차순입니다."/>
+                                </DataGridTextColumn.Header>
+                                <DataGridTextColumn.ElementStyle>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="HorizontalAlignment" Value="Right"/>
+                                        <Setter Property="FontWeight" Value="SemiBold"/>
+                                        <Setter Property="Foreground"
+                                                Value="{Binding DeltaBytes, Converter={StaticResource DeltaBrush}}"/>
+                                    </Style>
+                                </DataGridTextColumn.ElementStyle>
+                            </DataGridTextColumn>
+                            <DataGridTextColumn Binding="{Binding DeltaCount, Converter={StaticResource SignedCount}}"
+                                                Width="110">
+                                <DataGridTextColumn.Header>
+                                    <TextBlock Style="{StaticResource HeaderTip}" Text="개수 증감"
+                                               ToolTip="인스턴스 수가 얼마나 늘거나 줄었는지입니다. 네이티브 메모리를 감싸는 타입(VisionPro 이미지 등)은 크기가 잘 안 늘어나므로 이 열로 판단하세요."/>
+                                </DataGridTextColumn.Header>
+                                <DataGridTextColumn.ElementStyle>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="HorizontalAlignment" Value="Right"/>
+                                        <Setter Property="Foreground"
+                                                Value="{Binding DeltaCount, Converter={StaticResource DeltaBrush}}"/>
+                                    </Style>
+                                </DataGridTextColumn.ElementStyle>
+                            </DataGridTextColumn>
+                            <DataGridTextColumn Binding="{Binding CountA, StringFormat=N0}" Width="90">
+                                <DataGridTextColumn.Header>
+                                    <TextBlock Style="{StaticResource HeaderTip}" Text="A 개수"
+                                               ToolTip="먼저 찍은 스냅샷(A) 시점의 인스턴스 수입니다."/>
+                                </DataGridTextColumn.Header>
+                                <DataGridTextColumn.ElementStyle>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="HorizontalAlignment" Value="Right"/>
+                                    </Style>
+                                </DataGridTextColumn.ElementStyle>
+                            </DataGridTextColumn>
+                            <DataGridTextColumn Binding="{Binding CountB, StringFormat=N0}" Width="90">
+                                <DataGridTextColumn.Header>
+                                    <TextBlock Style="{StaticResource HeaderTip}" Text="B 개수"
+                                               ToolTip="나중에 찍은 스냅샷(B) 시점의 인스턴스 수입니다."/>
+                                </DataGridTextColumn.Header>
+                                <DataGridTextColumn.ElementStyle>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="HorizontalAlignment" Value="Right"/>
+                                    </Style>
+                                </DataGridTextColumn.ElementStyle>
+                            </DataGridTextColumn>
+                            <DataGridTextColumn Binding="{Binding BytesB, Converter={StaticResource Bytes}}"
+                                                Width="110">
+                                <DataGridTextColumn.Header>
+                                    <TextBlock Style="{StaticResource HeaderTip}" Text="B 크기"
+                                               ToolTip="스냅샷 B 시점에 이 타입이 차지한 관리 힙 크기입니다. 증가량이 아니라 현재 절대량입니다."/>
+                                </DataGridTextColumn.Header>
+                                <DataGridTextColumn.ElementStyle>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="HorizontalAlignment" Value="Right"/>
+                                    </Style>
+                                </DataGridTextColumn.ElementStyle>
+                            </DataGridTextColumn>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </DockPanel>
+            </TabItem>
+
+            <TabItem Header="GC 일시정지 (ETW)">
+                <Grid Margin="8">
+                    <DockPanel Visibility="{Binding IsElevated, Converter={StaticResource BoolToVis}}">
+                        <TextBlock DockPanel.Dock="Top" Text="{Binding GcSummary}"
+                                   FontFamily="Consolas" FontSize="12" Margin="0,0,0,8"
+                                   ToolTip="감시를 시작한 뒤 누적된 수치입니다. 총 일시정지는 그동안 대상이 GC 때문에 잃어버린 시간의 합이고, 파이널라이즈 승격이 계속 늘면 Dispose 누락을 의심하세요."/>
+
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" MinWidth="340"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*" MinWidth="340"/>
+                            </Grid.ColumnDefinitions>
+
+                            <!-- left: the whole stream, most of it routine -->
+                            <DockPanel Grid.Column="0" Margin="0,0,4,0">
+                                <TextBlock DockPanel.Dock="Top" Margin="0,0,0,6" FontWeight="SemiBold" Text="전체 GC"/>
+                                <TextBlock DockPanel.Dock="Top" Margin="0,0,0,6" TextWrapping="Wrap"
+                                           Foreground="{StaticResource FgDim}"
+                                           Text="일어난 모든 수집입니다. 대부분은 0/1세대의 짧은 정상 수집입니다."/>
+                                <DataGrid ItemsSource="{Binding GcEvents}">
+                                    <DataGrid.Columns>
+                                        <DataGridTextColumn Binding="{Binding Timestamp, StringFormat=HH:mm:ss.fff}" Width="88">
+                                            <DataGridTextColumn.Header>
+                                                <TextBlock Style="{StaticResource HeaderTip}" Text="시각" TextWrapping="Wrap"
+                                                           ToolTip="GC가 끝나고 프로그램이 다시 돌기 시작한 시각입니다. 오토런 로그의 느려진 사이클 시각과 맞춰 보세요."/>
+                                            </DataGridTextColumn.Header>
+                                        </DataGridTextColumn>
+                                        <DataGridTextColumn Binding="{Binding Generation}" Width="42">
+                                            <DataGridTextColumn.Header>
+                                                <TextBlock Style="{StaticResource HeaderTip}" Text="세대" TextWrapping="Wrap"
+                                                           ToolTip="이번에 청소한 세대입니다. 0은 갓 만든 객체만 훑어 매우 빠르고, 2는 힙 전체를 훑어 가장 오래 걸립니다."/>
+                                            </DataGridTextColumn.Header>
+                                        </DataGridTextColumn>
+                                        <DataGridTextColumn Binding="{Binding PauseMs, StringFormat=N2}" Width="80">
+                                            <DataGridTextColumn.Header>
+                                                <TextBlock Style="{StaticResource HeaderTip}" Text="일시정지 (ms)" TextWrapping="Wrap"
+                                                           ToolTip="이 GC 때문에 대상 프로그램의 모든 스레드가 멈춰 있던 시간입니다. 50 ms 이상 노란색, 200 ms 이상 빨간색."/>
+                                            </DataGridTextColumn.Header>
+                                            <DataGridTextColumn.ElementStyle>
+                                                <Style TargetType="TextBlock">
+                                                    <Setter Property="HorizontalAlignment" Value="Right"/>
+                                                    <Setter Property="FontWeight" Value="SemiBold"/>
+                                                    <Setter Property="Foreground" Value="{Binding PauseMs, Converter={StaticResource PauseBrush}}"/>
+                                                </Style>
+                                            </DataGridTextColumn.ElementStyle>
+                                        </DataGridTextColumn>
+                                        <DataGridTextColumn Binding="{Binding PromotedBytes, Converter={StaticResource Bytes}}" Width="76">
+                                            <DataGridTextColumn.Header>
+                                                <TextBlock Style="{StaticResource HeaderTip}" Text="승격" TextWrapping="Wrap"
+                                                           ToolTip="이번 GC에서 죽지 않고 살아남아 더 오래된 세대로 옮겨간 바이트입니다. 매번 크게 나오면 무언가를 계속 붙들고 있다는 뜻입니다."/>
+                                            </DataGridTextColumn.Header>
+                                            <DataGridTextColumn.ElementStyle>
+                                                <Style TargetType="TextBlock"><Setter Property="HorizontalAlignment" Value="Right"/></Style>
+                                            </DataGridTextColumn.ElementStyle>
+                                        </DataGridTextColumn>
+                                        <DataGridTextColumn Binding="{Binding FinalizationPromotedCount, StringFormat=N0}" Width="82">
+                                            <DataGridTextColumn.Header>
+                                                <TextBlock Style="{StaticResource HeaderTip}" Text="파이널라이즈 승격" TextWrapping="Wrap"
+                                                           ToolTip="정리(소멸자) 처리가 필요해서 파이널라이저 대기열로 넘어간 객체 수입니다. Dispose를 제대로 불렀다면 대개 0입니다."/>
+                                            </DataGridTextColumn.Header>
+                                            <DataGridTextColumn.ElementStyle>
+                                                <Style TargetType="TextBlock"><Setter Property="HorizontalAlignment" Value="Right"/></Style>
+                                            </DataGridTextColumn.ElementStyle>
+                                        </DataGridTextColumn>
+                                        <DataGridTextColumn Binding="{Binding Reason}" Width="98">
+                                            <DataGridTextColumn.Header>
+                                                <TextBlock Style="{StaticResource HeaderTip}" Text="이유" TextWrapping="Wrap"
+                                                           ToolTip="GC가 시작된 계기입니다. 값별 설명은 툴바의 'GC 값 설명' 버튼을 보세요."/>
+                                            </DataGridTextColumn.Header>
+                                        </DataGridTextColumn>
+                                        <DataGridTextColumn Binding="{Binding Kind}" Width="*">
+                                            <DataGridTextColumn.Header>
+                                                <TextBlock Style="{StaticResource HeaderTip}" Text="유형" TextWrapping="Wrap"
+                                                           ToolTip="수집 방식입니다. 값별 설명은 툴바의 'GC 값 설명' 버튼을 보세요."/>
+                                            </DataGridTextColumn.Header>
+                                        </DataGridTextColumn>
+                                    </DataGrid.Columns>
+                                </DataGrid>
+                            </DockPanel>
+
+                            <GridSplitter Grid.Column="1" Width="6" Background="Transparent"
+                                          HorizontalAlignment="Center" VerticalAlignment="Stretch"/>
+
+                            <!-- right: only the ones that broke the pattern -->
+                            <DockPanel Grid.Column="2" Margin="4,0,0,0">
+                                <TextBlock DockPanel.Dock="Top" Margin="0,0,0,6" FontWeight="SemiBold"
+                                           Foreground="#FFF48771" Text="특이 GC"/>
+                                <TextBlock DockPanel.Dock="Top" Margin="0,0,0,6" TextWrapping="Wrap"
+                                           Foreground="{StaticResource FgDim}"
+                                           Text="일시정지 50 ms 이상, 세대 2, 또는 이유·유형이 평소와 다른 수집만 모읍니다. 왼쪽 목록이 밀려 지워져도 여기에는 남습니다."/>
+                                <Grid>
+                                    <DataGrid ItemsSource="{Binding UnusualGcEvents}">
+                                        <DataGrid.Columns>
+                                            <DataGridTextColumn Binding="{Binding Timestamp, StringFormat=HH:mm:ss.fff}" Width="88">
+                                                <DataGridTextColumn.Header>
+                                                    <TextBlock Style="{StaticResource HeaderTip}" Text="시각" TextWrapping="Wrap"
+                                                               ToolTip="이 수집이 끝난 시각입니다. 오토런 로그의 느려진 사이클과 맞춰 보세요."/>
+                                                </DataGridTextColumn.Header>
+                                            </DataGridTextColumn>
+                                            <DataGridTextColumn Binding="{Binding Converter={StaticResource AnomalyReason}}" Width="*">
+                                                <DataGridTextColumn.Header>
+                                                    <TextBlock Style="{StaticResource HeaderTip}" Text="특이 사유" TextWrapping="Wrap"
+                                                               ToolTip="이 수집이 평소와 어떻게 달랐는지입니다. 해당하는 항목이 여러 개면 모두 나열됩니다."/>
+                                                </DataGridTextColumn.Header>
+                                                <DataGridTextColumn.ElementStyle>
+                                                    <Style TargetType="TextBlock">
+                                                        <Setter Property="Foreground" Value="#FFF48771"/>
+                                                        <Setter Property="FontWeight" Value="SemiBold"/>
+                                                    </Style>
+                                                </DataGridTextColumn.ElementStyle>
+                                            </DataGridTextColumn>
+                                            <DataGridTextColumn Binding="{Binding PauseMs, StringFormat=N2}" Width="80">
+                                                <DataGridTextColumn.Header>
+                                                    <TextBlock Style="{StaticResource HeaderTip}" Text="일시정지 (ms)" TextWrapping="Wrap"
+                                                               ToolTip="대상 프로그램의 모든 스레드가 멈춰 있던 시간입니다."/>
+                                                </DataGridTextColumn.Header>
+                                                <DataGridTextColumn.ElementStyle>
+                                                    <Style TargetType="TextBlock">
+                                                        <Setter Property="HorizontalAlignment" Value="Right"/>
+                                                        <Setter Property="FontWeight" Value="SemiBold"/>
+                                                        <Setter Property="Foreground" Value="{Binding PauseMs, Converter={StaticResource PauseBrush}}"/>
+                                                    </Style>
+                                                </DataGridTextColumn.ElementStyle>
+                                            </DataGridTextColumn>
+                                            <DataGridTextColumn Binding="{Binding PromotedBytes, Converter={StaticResource Bytes}}" Width="76">
+                                                <DataGridTextColumn.Header>
+                                                    <TextBlock Style="{StaticResource HeaderTip}" Text="승격" TextWrapping="Wrap"
+                                                               ToolTip="살아남아 더 오래된 세대로 옮겨간 바이트입니다."/>
+                                                </DataGridTextColumn.Header>
+                                                <DataGridTextColumn.ElementStyle>
+                                                    <Style TargetType="TextBlock"><Setter Property="HorizontalAlignment" Value="Right"/></Style>
+                                                </DataGridTextColumn.ElementStyle>
+                                            </DataGridTextColumn>
+                                        </DataGrid.Columns>
+                                    </DataGrid>
+
+                                    <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center"
+                                               TextAlignment="Center" TextWrapping="Wrap" MaxWidth="320"
+                                               Foreground="{StaticResource FgDim}"
+                                               Visibility="{Binding UnusualGcEvents.Count, Converter={StaticResource ZeroToVis}}"
+                                               Text="아직 특이한 수집이 없습니다. 전부 짧은 0/1세대 정상 수집이라는 뜻입니다."/>
+                                </Grid>
+                            </DockPanel>
+                        </Grid>
+                    </DockPanel>
+
+                    <StackPanel Visibility="{Binding IsElevated, Converter={StaticResource NotBoolToVis}}"
+                                HorizontalAlignment="Center" VerticalAlignment="Center" MaxWidth="560">
+                        <TextBlock Text="GC 일시정지 시간은 관리자 권한이 필요합니다"
+                                   FontSize="15" FontWeight="SemiBold" HorizontalAlignment="Center"/>
+                        <TextBlock Margin="0,10,0,0" TextWrapping="Wrap" TextAlignment="Center"
+                                   Foreground="{StaticResource FgDim}"
+                                   Text="ETW 세션은 관리자만 만들 수 있습니다. 켜면 GC 한 번이 대상을 몇 ms 멈췄는지, 그리고 승격 바이트와 파이널라이즈 승격 수를 직접 측정합니다. GC 키워드만 켜므로 대상 부하는 무시할 수준입니다."/>
+                        <TextBlock Margin="0,10,0,0" TextWrapping="Wrap" TextAlignment="Center"
+                                   Foreground="{StaticResource FgDim}"
+                                   Text="스냅샷과 비교 기능은 지금 이대로 계속 쓸 수 있습니다."/>
+                        <Button Content="관리자 권한으로 다시 실행" Command="{Binding RestartAsAdminCommand}"
+                                Background="{StaticResource Accent}" HorizontalAlignment="Center"
+                                Margin="0,18,0,0" Padding="16,7"/>
+                    </StackPanel>
+                </Grid>
+            </TabItem>
+
+
+            <TabItem Header="네이티브 (VirtualAlloc)">
+                <DockPanel Margin="8">
+                    <TextBlock DockPanel.Dock="Top" Text="{Binding NativeSummary}"
+                               FontFamily="Consolas" FontSize="12" Margin="0,0,0,8"
+                               ToolTip="대상이 관리 힙 밖에서 잡은 메모리입니다. 순증이 계속 커지면 네이티브 누수입니다. '모듈 확인'은 호출 스택으로 주인을 찾아낸 비율입니다."/>
+                    <TextBlock DockPanel.Dock="Top" Margin="0,0,0,6" TextWrapping="Wrap"
+                               Foreground="{StaticResource FgDim}"
+                               Text="비교 탭에서 고른 A&#x2192;B 스냅샷 사이에, 관리 힙 밖의 메모리를 누가 요청했는지 모듈 단위로 보여줍니다. 타입 표가 설명하지 못하는 증가분이 여기서 잡힙니다."/>
+                    <Grid>
+                        <DataGrid ItemsSource="{Binding NativeModules}">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Binding="{Binding Module}" Width="*">
+                                    <DataGridTextColumn.Header>
+                                        <TextBlock Style="{StaticResource HeaderTip}" Text="모듈" TextWrapping="Wrap"
+                                                   ToolTip="할당을 요청한 모듈입니다. ntdll이나 kernelbase 같은 공통 배관은 건너뛰고, 실제로 메모리를 원한 호출자를 찾습니다."/>
+                                    </DataGridTextColumn.Header>
+                                </DataGridTextColumn>
+                                <DataGridTextColumn Binding="{Binding NetBytes, Converter={StaticResource SignedBytes}}" Width="120">
+                                    <DataGridTextColumn.Header>
+                                        <TextBlock Style="{StaticResource HeaderTip}" Text="순증" TextWrapping="Wrap"
+                                                   ToolTip="할당에서 해제를 뺀 값입니다. 이 값이 계속 커지는 모듈이 네이티브 누수의 범인입니다."/>
+                                    </DataGridTextColumn.Header>
+                                    <DataGridTextColumn.ElementStyle>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="HorizontalAlignment" Value="Right"/>
+                                            <Setter Property="FontWeight" Value="SemiBold"/>
+                                            <Setter Property="Foreground" Value="{Binding NetBytes, Converter={StaticResource DeltaBrush}}"/>
+                                        </Style>
+                                    </DataGridTextColumn.ElementStyle>
+                                </DataGridTextColumn>
+                                <DataGridTextColumn Binding="{Binding AllocatedBytes, Converter={StaticResource Bytes}}" Width="110">
+                                    <DataGridTextColumn.Header>
+                                        <TextBlock Style="{StaticResource HeaderTip}" Text="할당" TextWrapping="Wrap"
+                                                   ToolTip="감시를 시작한 뒤 이 모듈이 요청한 네이티브 메모리 총량입니다."/>
+                                    </DataGridTextColumn.Header>
+                                    <DataGridTextColumn.ElementStyle>
+                                        <Style TargetType="TextBlock"><Setter Property="HorizontalAlignment" Value="Right"/></Style>
+                                    </DataGridTextColumn.ElementStyle>
+                                </DataGridTextColumn>
+                                <DataGridTextColumn Binding="{Binding FreedBytes, Converter={StaticResource Bytes}}" Width="110">
+                                    <DataGridTextColumn.Header>
+                                        <TextBlock Style="{StaticResource HeaderTip}" Text="해제" TextWrapping="Wrap"
+                                                   ToolTip="그중 되돌려준 양입니다. 할당에 비해 해제가 거의 없으면 붙들고 있다는 뜻입니다."/>
+                                    </DataGridTextColumn.Header>
+                                    <DataGridTextColumn.ElementStyle>
+                                        <Style TargetType="TextBlock"><Setter Property="HorizontalAlignment" Value="Right"/></Style>
+                                    </DataGridTextColumn.ElementStyle>
+                                </DataGridTextColumn>
+                                <DataGridTextColumn Binding="{Binding AllocCount, StringFormat=N0}" Width="90">
+                                    <DataGridTextColumn.Header>
+                                        <TextBlock Style="{StaticResource HeaderTip}" Text="할당 건수" TextWrapping="Wrap"
+                                                   ToolTip="할당 호출 횟수입니다. 순증을 건수로 나누면 1건당 크기를 알 수 있습니다."/>
+                                    </DataGridTextColumn.Header>
+                                    <DataGridTextColumn.ElementStyle>
+                                        <Style TargetType="TextBlock"><Setter Property="HorizontalAlignment" Value="Right"/></Style>
+                                    </DataGridTextColumn.ElementStyle>
+                                </DataGridTextColumn>
+                                <DataGridTextColumn Binding="{Binding FreeCount, StringFormat=N0}" Width="90">
+                                    <DataGridTextColumn.Header>
+                                        <TextBlock Style="{StaticResource HeaderTip}" Text="해제 건수" TextWrapping="Wrap"
+                                                   ToolTip="해제 호출 횟수입니다."/>
+                                    </DataGridTextColumn.Header>
+                                    <DataGridTextColumn.ElementStyle>
+                                        <Style TargetType="TextBlock"><Setter Property="HorizontalAlignment" Value="Right"/></Style>
+                                    </DataGridTextColumn.ElementStyle>
+                                </DataGridTextColumn>
+                            </DataGrid.Columns>
+                        </DataGrid>
+
+                        <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center"
+                                   TextAlignment="Center" TextWrapping="Wrap" MaxWidth="460"
+                                   FontSize="13" Foreground="{StaticResource FgDim}"
+                                   Visibility="{Binding NativeModules.Count, Converter={StaticResource ZeroToVis}}"
+                                   Text="{Binding NativeStatus}"/>
+                    </Grid>
+                </DockPanel>
+            </TabItem>
+
+        </TabControl>
+
+        <!-- status bar -->
+        <Border Grid.Row="4" Background="{StaticResource Panel}" BorderBrush="{StaticResource Border}"
+                BorderThickness="0,1,0,0" Padding="12,7">
+            <DockPanel>
+                <TextBlock DockPanel.Dock="Right" Text="스냅샷 수집 중..." Foreground="#FF1F9CF0"
+                           Visibility="{Binding IsBusy, Converter={StaticResource BoolToVis}}"/>
+                <TextBlock Text="{Binding Status}" Foreground="{StaticResource FgDim}"/>
+            </DockPanel>
+        </Border>
+    </Grid>
+</UserControl>

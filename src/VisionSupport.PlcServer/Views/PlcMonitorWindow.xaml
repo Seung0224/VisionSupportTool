@@ -1,0 +1,22 @@
+<Window x:Class="VirtualPlcServer.Views.PlcMonitorWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+        Title="Module Monitor" Height="640" Width="720"
+        Background="{DynamicResource AppWindowBackgroundBrush}"
+        FontFamily="{materialDesign:MaterialDesignFont}">
+    <!-- A separate window is its own visual tree, so it does not inherit the feature page's
+         scoped theme and has to merge it itself. Background is a DynamicResource because the
+         attribute is parsed before these resources exist. -->
+    <Window.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="/VisionSupport.PlcServer;component/Themes/AppTheme.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </Window.Resources>
+
+    <materialDesign:DialogHost Identifier="MonitorDialog">
+        <ContentControl x:Name="HostContent" />
+    </materialDesign:DialogHost>
+</Window>

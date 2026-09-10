@@ -1,0 +1,169 @@
+<Window x:Class="VisionSupport.Shell.ShellWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="VISION 지원툴"
+        Height="900" Width="1500" MinHeight="600" MinWidth="1000"
+        Background="{StaticResource Bg}"
+        TextOptions.TextFormattingMode="Display"
+        ToolTipService.ShowDuration="30000" ToolTipService.InitialShowDelay="350">
+
+    <Window.Resources>
+        <!-- The rail rows. Not the themed Button: these are full-bleed, left-aligned and carry
+             their own selected state, so they replace the chrome rather than inherit it. -->
+        <Style x:Key="NavButton" TargetType="Button">
+            <Setter Property="Margin" Value="0"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Chrome" Background="Transparent" Height="42">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="3"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Rectangle x:Name="Marker" Grid.Column="0" Fill="Transparent"/>
+                                <Ellipse Grid.Column="1" Width="8" Height="8" Margin="15,0,0,0"
+                                         VerticalAlignment="Center"
+                                         Fill="{Binding State, Converter={StaticResource StateBrush}}"
+                                         Visibility="{Binding HasModule, Converter={StaticResource BoolToVis}}"/>
+                                <TextBlock x:Name="Label" Grid.Column="2" Text="{Binding Title}"
+                                           Margin="12,0,12,0" VerticalAlignment="Center"
+                                           TextTrimming="CharacterEllipsis"/>
+                            </Grid>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Chrome" Property="Background" Value="#FF2A2D2E"/>
+                            </Trigger>
+                            <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                                <Setter TargetName="Chrome" Property="Background" Value="{StaticResource Accent}"/>
+                                <Setter TargetName="Marker" Property="Fill" Value="{StaticResource AccentBright}"/>
+                                <Setter TargetName="Label" Property="Foreground" Value="White"/>
+                                <Setter TargetName="Label" Property="FontWeight" Value="SemiBold"/>
+                            </DataTrigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Hamburger: three bars, drawn rather than pulled from an icon pack. -->
+        <Style x:Key="HamburgerButton" TargetType="Button">
+            <Setter Property="Margin" Value="0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Chrome" Background="Transparent" Width="44" Height="44">
+                            <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                                <Rectangle Width="16" Height="2" Fill="{StaticResource Fg}" Margin="0,0,0,3"/>
+                                <Rectangle Width="16" Height="2" Fill="{StaticResource Fg}" Margin="0,0,0,3"/>
+                                <Rectangle Width="16" Height="2" Fill="{StaticResource Fg}"/>
+                            </StackPanel>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Chrome" Property="Background" Value="#FF2A2D2E"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+
+        <!-- nav rail -->
+        <Border Grid.Column="0" Background="{StaticResource Panel}"
+                BorderBrush="{StaticResource Border}" BorderThickness="0,0,1,0">
+            <Border.Style>
+                <Style TargetType="Border">
+                    <Setter Property="Width" Value="240"/>
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding IsNavExpanded}" Value="False">
+                            <Setter Property="Width" Value="48"/>
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Border.Style>
+
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <Grid Grid.Row="0" Height="44">
+                    <Button Style="{StaticResource HamburgerButton}" Command="{Binding ToggleNavCommand}"
+                            HorizontalAlignment="Left" ToolTip="메뉴 접기/펼치기"/>
+                    <TextBlock Text="VISION 지원툴" Margin="52,0,0,0" FontWeight="SemiBold"
+                               Foreground="{StaticResource FgDim}" FontSize="12"
+                               Visibility="{Binding IsNavExpanded, Converter={StaticResource BoolToVis}}"/>
+                </Grid>
+
+                <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+                    <ItemsControl ItemsSource="{Binding Items}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Button Style="{StaticResource NavButton}"
+                                        Command="{Binding DataContext.SelectCommand,
+                                                  RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                        CommandParameter="{Binding}"/>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+            </Grid>
+        </Border>
+
+        <!-- content -->
+        <Grid Grid.Column="1">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+
+            <!-- command bar: the three states live here, always for the page you are looking at -->
+            <Border Grid.Row="0" Background="{StaticResource Panel}"
+                    BorderBrush="{StaticResource Border}" BorderThickness="0,0,0,1" Padding="16,9"
+                    Visibility="{Binding HasCommands, Converter={StaticResource BoolToVis}}">
+                <Grid>
+                    <StackPanel Orientation="Horizontal">
+                        <Ellipse Width="9" Height="9" Margin="0,0,10,0"
+                                 Fill="{Binding CurrentState, Converter={StaticResource StateBrush}}"/>
+                        <TextBlock Text="{Binding CurrentTitle}" FontWeight="SemiBold" FontSize="14"/>
+                        <TextBlock Text="{Binding CurrentState, Converter={StaticResource StateText}}"
+                                   Foreground="{StaticResource FgDim}" FontSize="11" Margin="12,1,0,0"/>
+                        <Rectangle Width="1" Fill="{StaticResource Border}" Margin="14,3"
+                                   Visibility="{Binding CurrentStatusLine, Converter={StaticResource EmptyToVis}}"/>
+                        <TextBlock Text="{Binding CurrentStatusLine}" FontFamily="Consolas" FontSize="11"
+                                   Foreground="{StaticResource FgDim}"/>
+                    </StackPanel>
+
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                        <Button Content="▶  실행" Command="{Binding StartCommand}"
+                                IsEnabled="{Binding CanStart}" Background="{StaticResource Accent}"
+                                ToolTip="기능을 시작합니다. 정지 상태였다면 멈춘 지점에서 이어서 재개합니다."/>
+                        <Button Content="⏸  정지" Command="{Binding PauseCommand}"
+                                IsEnabled="{Binding CanPause}"
+                                ToolTip="연결과 값은 그대로 두고 동작만 멈춥니다. 다시 실행하면 이어집니다."/>
+                        <Button Content="⏹  종료" Command="{Binding StopCommand}"
+                                IsEnabled="{Binding CanStop}" Margin="0"
+                                ToolTip="기능이 잡고 있던 포트·스레드·세션을 모두 반납하고 완전히 내립니다. 지원툴은 계속 실행됩니다."/>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <ContentControl Grid.Row="1" Content="{Binding Content}"/>
+        </Grid>
+    </Grid>
+</Window>

@@ -1,0 +1,45 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net9.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <!-- The memory monitor attaches to x64 targets with ClrMD, and the reader must match the
+         target's bitness. Pinning x64 makes that constraint explicit for the whole app. -->
+    <PlatformTarget>x64</PlatformTarget>
+    <AssemblyName>VisionSupport</AssemblyName>
+    <RootNamespace>VisionSupport</RootNamespace>
+    <!-- Always runs elevated; see the comment in app.manifest for why. -->
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
+  </ItemGroup>
+
+  <!-- The hosted features. The dependency only runs this way: a feature never references the
+       shell, so nothing inside a feature can reach the nav rail or the other features. -->
+  <ItemGroup>
+    <ProjectReference Include="..\VisionSupport.MemoryMonitor\VisionSupport.MemoryMonitor.csproj" />
+    <ProjectReference Include="..\VisionSupport.PlcServer\VisionSupport.PlcServer.csproj" />
+    <ProjectReference Include="..\VisionSupport.ImageConverter\VisionSupport.ImageConverter.csproj" />
+  </ItemGroup>
+
+  <!-- The optional Cognex .idb codec. Referenced for build order only - never linked - so the
+       plugin DLL is built before the shell and copied into plugins\ below. The shell talks to it
+       only through reflection (CognexCodecLoader), and it self-stubs when VisionPro is absent. -->
+  <ItemGroup>
+    <ProjectReference Include="..\VisionSupport.ImageConverter.Cognex\VisionSupport.ImageConverter.Cognex.csproj"
+                      ReferenceOutputAssembly="false" Private="false" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\VisionSupport.ImageConverter.Cognex\bin\$(Configuration)\net9.0-windows\VisionSupport.ImageConverter.Cognex.dll"
+          Condition="Exists('..\VisionSupport.ImageConverter.Cognex\bin\$(Configuration)\net9.0-windows\VisionSupport.ImageConverter.Cognex.dll')"
+          Link="plugins\VisionSupport.ImageConverter.Cognex.dll" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>

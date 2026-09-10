@@ -1,0 +1,145 @@
+<UserControl x:Class="VirtualPlcServer.Views.AddModuleDialog"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+             xmlns:fa="http://schemas.awesome.incremented/wpf/xaml/fontawesome.sharp"
+             xmlns:vm="clr-namespace:VirtualPlcServer.ViewModels"
+             xmlns:local="clr-namespace:VirtualPlcServer.Views"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             mc:Ignorable="d"
+             d:DataContext="{d:DesignInstance vm:AddModuleDialogViewModel}"
+             Width="480" MaxHeight="640">
+    <!-- The theme is merged here, not inherited. This dialog is built with `new` and shown
+         through DialogHost, so at the moment its XAML is parsed it has no parent to inherit
+         from and StaticResource can only see this dictionary and Application.Resources - where
+         the feature's theme deliberately no longer lives. -->
+    <UserControl.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="/VisionSupport.PlcServer;component/Themes/AppTheme.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+
+            <local:InverseBooleanToVisibilityConverter x:Key="InverseBooleanToVisibilityConverter" />
+            <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
+            <local:BoolToOpacityConverter x:Key="BoolToOpacityConverter" />
+            <local:IntEqualsToVisibilityConverter x:Key="IntEqualsToVisibilityConverter" />
+        </ResourceDictionary>
+    </UserControl.Resources>
+
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <TextBlock Grid.Row="0" Text="ADD MODULE" FontSize="18" FontWeight="Bold" Margin="0,0,0,16" />
+
+        <!-- Step 1: pick a module type -->
+        <ItemsControl Grid.Row="1" ItemsSource="{Binding Types}"
+                      Visibility="{Binding TypeChosen, Converter={StaticResource InverseBooleanToVisibilityConverter}}">
+            <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <UniformGrid Columns="3" />
+                </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                    <materialDesign:Card Margin="6" Padding="12" Height="110"
+                                          BorderBrush="{StaticResource AppBorderBrush}" BorderThickness="1"
+                                          Opacity="{Binding IsAvailable, Converter={StaticResource BoolToOpacityConverter}}">
+                        <Button Command="{Binding DataContext.ChooseTypeCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                CommandParameter="{Binding}"
+                                Style="{StaticResource MaterialDesignFlatButton}"
+                                Height="Auto" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
+                                IsEnabled="{Binding IsAvailable}">
+                            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                                <fa:IconBlock Icon="{Binding Icon}" FontSize="28" HorizontalAlignment="Center"
+                                              Foreground="{DynamicResource MaterialDesign.Brush.Primary}" />
+                                <TextBlock Text="{Binding Name}" Margin="0,8,0,0" TextWrapping="Wrap"
+                                           TextAlignment="Center" HorizontalAlignment="Center" />
+                                <TextBlock Text="{Binding UnavailableReason}" FontSize="10" Foreground="Gray"
+                                           HorizontalAlignment="Center"
+                                           Visibility="{Binding IsAvailable, Converter={StaticResource InverseBooleanToVisibilityConverter}}" />
+                            </StackPanel>
+                        </Button>
+                    </materialDesign:Card>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+        <!-- Step 2: configure the chosen type -->
+        <StackPanel Grid.Row="1"
+                    Visibility="{Binding TypeChosen, Converter={StaticResource BooleanToVisibilityConverter}}">
+
+            <TextBox materialDesign:HintAssist.Hint="Module Name (e.g. &quot;MC 1&quot;)" Text="{Binding ModuleName}" Margin="0,0,0,8" />
+
+            <!-- Communication server fields -->
+            <StackPanel Visibility="{Binding IsPlcServerSelected, Converter={StaticResource BooleanToVisibilityConverter}}">
+                <ComboBox materialDesign:HintAssist.Hint="Protocol"
+                          SelectedIndex="{Binding ProtocolIndex}" Margin="0,0,0,8">
+                    <ComboBoxItem Content="MC Protocol (Mitsubishi, UDP)" />
+                    <ComboBoxItem Content="OPC UA" />
+                    <ComboBoxItem Content="TwinCAT ADS" />
+                    <ComboBoxItem Content="MC Protocol (LS, TCP)" />
+                </ComboBox>
+
+                <!-- MC(UDP) fields -->
+                <StackPanel Visibility="{Binding ProtocolIndex, Converter={StaticResource IntEqualsToVisibilityConverter}, ConverterParameter=0}">
+                    <TextBox materialDesign:HintAssist.Hint="Listen IP (blank = Any)" Text="{Binding McListenIp}" Margin="0,4" />
+                    <TextBox materialDesign:HintAssist.Hint="Read Port" Text="{Binding McReadPort}" Margin="0,4" />
+                    <TextBox materialDesign:HintAssist.Hint="Write Port" Text="{Binding McWritePort}" Margin="0,4" />
+                    <TextBox materialDesign:HintAssist.Hint="Start Address (D)" Text="{Binding McStartAddress}" Margin="0,4" />
+                    <TextBox materialDesign:HintAssist.Hint="Size" Text="{Binding McSize}" Margin="0,4" />
+                </StackPanel>
+
+                <!-- MC(TCP/LS) fields -->
+                <StackPanel Visibility="{Binding ProtocolIndex, Converter={StaticResource IntEqualsToVisibilityConverter}, ConverterParameter=3}">
+                    <TextBox materialDesign:HintAssist.Hint="Listen IP (blank = Any)" Text="{Binding McTcpListenIp}" Margin="0,4" />
+                    <TextBox materialDesign:HintAssist.Hint="Read Port" Text="{Binding McTcpReadPort}" Margin="0,4" />
+                    <TextBox materialDesign:HintAssist.Hint="Write Port" Text="{Binding McTcpWritePort}" Margin="0,4" />
+                    <TextBox materialDesign:HintAssist.Hint="Device (D/R/W)" Text="{Binding McTcpDevice}" Margin="0,4" />
+                    <TextBox materialDesign:HintAssist.Hint="Start Address" Text="{Binding McTcpStartAddress}" Margin="0,4" />
+                    <TextBox materialDesign:HintAssist.Hint="Size" Text="{Binding McTcpSize}" Margin="0,4" />
+                </StackPanel>
+
+                <!-- OPC UA fields -->
+                <StackPanel Visibility="{Binding ProtocolIndex, Converter={StaticResource IntEqualsToVisibilityConverter}, ConverterParameter=1}">
+                    <TextBox materialDesign:HintAssist.Hint="Port" Text="{Binding OpcUaPort}" Margin="0,4" />
+                    <TextBox materialDesign:HintAssist.Hint="Application Name" Text="{Binding OpcUaAppName}" Margin="0,4" />
+                    <CheckBox Content="Seed default Jastech nodes" IsChecked="{Binding OpcUaSeedJastechNodes}" Margin="0,8,0,0" />
+                </StackPanel>
+
+                <!-- ADS fields -->
+                <StackPanel Visibility="{Binding ProtocolIndex, Converter={StaticResource IntEqualsToVisibilityConverter}, ConverterParameter=2}">
+                    <TextBox materialDesign:HintAssist.Hint="AMS Port" Text="{Binding AdsAmsPort}" Margin="0,4" />
+                    <TextBox materialDesign:HintAssist.Hint="Port Name" Text="{Binding AdsPortName}" Margin="0,4" />
+                </StackPanel>
+
+                <CheckBox Content="Load last saved state (matched by module name)" IsChecked="{Binding LoadLastState}" Margin="0,12,0,0" />
+            </StackPanel>
+
+            <!-- Scenario: nothing else to configure up front - rules are added afterward from the module's own editor window -->
+            <TextBlock Visibility="{Binding IsScenarioSelected, Converter={StaticResource BooleanToVisibilityConverter}}"
+                       Text="A Scenario starts with no rules. Add it, then open it from the board to add trigger/action rules referencing your PLC modules."
+                       TextWrapping="Wrap" Foreground="Gray" FontSize="12" Margin="0,4,0,0" />
+
+            <TextBlock Text="{Binding ErrorMessage}" Foreground="{StaticResource StatusStoppedBrush}"
+                       TextWrapping="Wrap" Margin="0,8,0,0" />
+
+            <Grid Margin="0,20,0,0">
+                <Button Content="BACK" Command="{Binding BackCommand}"
+                        Style="{StaticResource MaterialDesignFlatButton}"
+                        HorizontalAlignment="Left" />
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                    <Button Content="CANCEL"
+                            Style="{StaticResource MaterialDesignFlatButton}"
+                            Command="{x:Static materialDesign:DialogHost.CloseDialogCommand}"
+                            Margin="0,0,8,0" />
+                    <Button Content="ADD" Click="OnAddClicked"
+                            Style="{StaticResource MaterialDesignRaisedButton}" />
+                </StackPanel>
+            </Grid>
+        </StackPanel>
+    </Grid>
+</UserControl>

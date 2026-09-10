@@ -1,0 +1,123 @@
+<Window x:Class="MemMon.GcReferenceWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:MemMon"
+        Title="GC 값 설명"
+        Height="860" Width="1020" MinHeight="480" MinWidth="820"
+        WindowStartupLocation="CenterOwner"
+        Background="{StaticResource Bg}"
+        TextOptions.TextFormattingMode="Display">
+
+    <Window.Resources>
+        <local:ToneBrushConverter x:Key="ToneBrush"/>
+        <local:ToneLabelConverter x:Key="ToneLabel"/>
+
+        <Style x:Key="GlossaryGrid" TargetType="DataGrid" BasedOn="{StaticResource {x:Type DataGrid}}">
+            <Setter Property="RowHeight" Value="NaN"/>
+            <Setter Property="CanUserSortColumns" Value="False"/>
+            <Setter Property="HeadersVisibility" Value="Column"/>
+        </Style>
+
+        <Style x:Key="WrapCell" TargetType="TextBlock">
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="Margin" Value="0,6,0,6"/>
+        </Style>
+    </Window.Resources>
+
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <StackPanel Grid.Row="0" Margin="0,0,0,10">
+            <TextBlock Text="이유 — GC가 시작된 계기" FontSize="15" FontWeight="SemiBold"/>
+            <TextBlock Margin="0,4,0,0" Foreground="{StaticResource FgDim}"
+                       Text="GC 일시정지 탭의 '이유' 열에 나오는 값입니다."/>
+        </StackPanel>
+
+        <DataGrid Grid.Row="1" Style="{StaticResource GlossaryGrid}" ItemsSource="{Binding Reasons}">
+            <DataGrid.Columns>
+                <DataGridTemplateColumn Header="구분" Width="70">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding Tone, Converter={StaticResource ToneLabel}}"
+                                       Foreground="{Binding Tone, Converter={StaticResource ToneBrush}}"
+                                       FontWeight="SemiBold" Margin="0,6,0,6"/>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+                <DataGridTemplateColumn Header="값" Width="185">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding Value}" FontFamily="Consolas"
+                                       Foreground="{Binding Tone, Converter={StaticResource ToneBrush}}"
+                                       Margin="0,6,0,6"/>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+                <DataGridTemplateColumn Header="뜻" Width="2*">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding Meaning}" Style="{StaticResource WrapCell}"/>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+                <DataGridTemplateColumn Header="봤을 때" Width="3*">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding Advice}" Style="{StaticResource WrapCell}"
+                                       Foreground="{StaticResource FgDim}"/>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+            </DataGrid.Columns>
+        </DataGrid>
+
+        <StackPanel Grid.Row="2" Margin="0,18,0,10">
+            <TextBlock Text="유형 — 어떻게 수집했나" FontSize="15" FontWeight="SemiBold"/>
+            <TextBlock Margin="0,4,0,0" Foreground="{StaticResource FgDim}"
+                       Text="GC 일시정지 탭의 '유형' 열에 나오는 값입니다."/>
+        </StackPanel>
+
+        <DataGrid Grid.Row="3" Style="{StaticResource GlossaryGrid}" ItemsSource="{Binding Kinds}"
+                  MaxHeight="220">
+            <DataGrid.Columns>
+                <DataGridTemplateColumn Header="값" Width="185">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding Value}" FontFamily="Consolas" Margin="0,6,0,6"/>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+                <DataGridTemplateColumn Header="뜻" Width="2*">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding Meaning}" Style="{StaticResource WrapCell}"/>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+                <DataGridTemplateColumn Header="봤을 때" Width="3*">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding Advice}" Style="{StaticResource WrapCell}"
+                                       Foreground="{StaticResource FgDim}"/>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+            </DataGrid.Columns>
+        </DataGrid>
+
+        <Border Grid.Row="4" Margin="0,16,0,0" Padding="14,12" CornerRadius="4"
+                Background="{StaticResource Panel}" BorderBrush="{StaticResource Border}" BorderThickness="1">
+            <StackPanel>
+                <TextBlock Text="긴 멈춤을 찾을 때" FontWeight="SemiBold" Margin="0,0,0,6"/>
+                <TextBlock Text="{Binding HowToRead}" TextWrapping="Wrap" LineHeight="20"
+                           Foreground="{StaticResource FgDim}"/>
+            </StackPanel>
+        </Border>
+    </Grid>
+</Window>

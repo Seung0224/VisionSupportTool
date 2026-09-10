@@ -1,0 +1,201 @@
+<UserControl x:Class="VisionSupport.ImageConverter.ImageConverterView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Background="{StaticResource Bg}"
+             TextOptions.TextFormattingMode="Display">
+
+    <UserControl.Resources>
+        <Style x:Key="SectionHeader" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{StaticResource FgDim}"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Margin" Value="0,0,0,8"/>
+        </Style>
+        <Style x:Key="FieldLabel" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{StaticResource FgDim}"/>
+            <Setter Property="Margin" Value="0,0,8,0"/>
+        </Style>
+    </UserControl.Resources>
+
+    <Grid>
+        <Grid Margin="0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" MinWidth="260"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="320" MinWidth="280"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="300" MinWidth="260"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- queue -->
+            <DockPanel Grid.Column="0" Margin="12">
+                <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,8">
+                    <Button Content="파일 추가" Command="{Binding AddFilesCommand}"/>
+                    <Button Content="폴더 추가" Command="{Binding AddFolderCommand}"/>
+                    <Button Content="선택 삭제" Command="{Binding RemoveSelectedCommand}"/>
+                    <Button Content="비우기" Command="{Binding ClearQueueCommand}"/>
+                </StackPanel>
+                <CheckBox DockPanel.Dock="Bottom" Content="폴더 추가 시 하위 폴더 포함" Margin="2,8,0,0"
+                          Foreground="{StaticResource Fg}" IsChecked="{Binding RecurseFolders}"/>
+                <TextBlock DockPanel.Dock="Bottom" Margin="2,10,0,0" Foreground="{StaticResource FgDim}" FontSize="11"
+                           Text="여기로 이미지 파일이나 폴더를 끌어다 놓으세요."/>
+                <ListBox ItemsSource="{Binding Queue}" SelectedItem="{Binding SelectedItem}">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Ellipse x:Name="Dot" Grid.Column="0" Width="9" Height="9" Margin="0,0,9,0"
+                                         VerticalAlignment="Center" Fill="{StaticResource StateStopped}"/>
+                                <StackPanel Grid.Column="1">
+                                    <TextBlock Text="{Binding FileName}"/>
+                                    <TextBlock Text="{Binding Message}" FontSize="11" Foreground="{StaticResource FgDim}"
+                                               TextTrimming="CharacterEllipsis"/>
+                                </StackPanel>
+                            </Grid>
+                            <DataTemplate.Triggers>
+                                <DataTrigger Binding="{Binding Status}" Value="Converting">
+                                    <Setter TargetName="Dot" Property="Fill" Value="{StaticResource StatePaused}"/>
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding Status}" Value="Done">
+                                    <Setter TargetName="Dot" Property="Fill" Value="{StaticResource StateRunning}"/>
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding Status}" Value="Failed">
+                                    <Setter TargetName="Dot" Property="Fill" Value="{StaticResource StateFaulted}"/>
+                                </DataTrigger>
+                            </DataTemplate.Triggers>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </DockPanel>
+
+            <Rectangle Grid.Column="1" Width="1" Fill="{StaticResource Border}" Margin="0,12"/>
+
+            <!-- options -->
+            <ScrollViewer Grid.Column="2" Margin="12" VerticalScrollBarVisibility="Auto">
+                <StackPanel>
+                    <TextBlock Text="출력 포맷" Style="{StaticResource SectionHeader}"/>
+                    <ComboBox x:Name="FormatCombo" ItemsSource="{Binding OutputFormats}"
+                              SelectedItem="{Binding Options.TargetFormat, Mode=TwoWay}"
+                              SelectionChanged="OnFormatChanged"/>
+
+                    <TextBlock x:Name="PngNote" Margin="0,8,0,0" TextWrapping="Wrap" FontSize="11"
+                               Foreground="{StaticResource FgDim}" Visibility="Collapsed"
+                               Text="PNG는 무손실이며 이 도구에서 압축률을 조절할 수 없습니다."/>
+
+                    <StackPanel x:Name="JpegQualityPanel" Margin="0,10,0,0" Visibility="Collapsed">
+                        <DockPanel>
+                            <TextBlock Text="JPEG 품질" Style="{StaticResource FieldLabel}"/>
+                            <TextBlock Text="{Binding Options.JpegQuality}" HorizontalAlignment="Right"
+                                       Foreground="{StaticResource Fg}"/>
+                        </DockPanel>
+                        <Slider Minimum="1" Maximum="100" Value="{Binding Options.JpegQuality, Mode=TwoWay}"
+                                IsSnapToTickEnabled="True" TickFrequency="1"/>
+                    </StackPanel>
+
+                    <StackPanel x:Name="JpegXrQualityPanel" Margin="0,10,0,0" Visibility="Collapsed">
+                        <DockPanel>
+                            <TextBlock Text="JPEG XR 품질" Style="{StaticResource FieldLabel}"/>
+                            <TextBlock Text="{Binding Options.JpegXrQuality}" HorizontalAlignment="Right"
+                                       Foreground="{StaticResource Fg}"/>
+                        </DockPanel>
+                        <Slider Minimum="0" Maximum="100" Value="{Binding Options.JpegXrQuality, Mode=TwoWay}"
+                                IsSnapToTickEnabled="True" TickFrequency="1"/>
+                    </StackPanel>
+
+                    <StackPanel x:Name="TiffCompressionPanel" Margin="0,10,0,0" Visibility="Collapsed">
+                        <TextBlock Text="TIFF 압축" Style="{StaticResource FieldLabel}"/>
+                        <ComboBox ItemsSource="{Binding TiffCompressionOptions}"
+                                  SelectedItem="{Binding Options.TiffCompression, Mode=TwoWay}"/>
+                    </StackPanel>
+
+                    <TextBlock Text="크기 조절" Style="{StaticResource SectionHeader}" Margin="0,20,0,8"/>
+                    <ComboBox ItemsSource="{Binding ResizeKindOptions}"
+                              SelectedItem="{Binding Options.ResizeKind, Mode=TwoWay}"/>
+                    <Grid Margin="0,8,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="10"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <DockPanel Grid.Column="0">
+                            <TextBlock Text="너비" Style="{StaticResource FieldLabel}"/>
+                            <TextBox Text="{Binding Options.ResizeWidth, Mode=TwoWay}"/>
+                        </DockPanel>
+                        <DockPanel Grid.Column="2">
+                            <TextBlock Text="높이" Style="{StaticResource FieldLabel}"/>
+                            <TextBox Text="{Binding Options.ResizeHeight, Mode=TwoWay}"/>
+                        </DockPanel>
+                    </Grid>
+                    <CheckBox Content="비율 유지" Margin="2,8,0,0" Foreground="{StaticResource Fg}"
+                              IsChecked="{Binding Options.KeepAspect, Mode=TwoWay}"/>
+                    <DockPanel Margin="0,8,0,0">
+                        <TextBlock Text="퍼센트" Style="{StaticResource FieldLabel}"/>
+                        <TextBox Text="{Binding Options.ResizePercent, Mode=TwoWay}"/>
+                    </DockPanel>
+
+                    <TextBlock Text="색상" Style="{StaticResource SectionHeader}" Margin="0,20,0,8"/>
+                    <CheckBox Content="그레이스케일로 변환" Foreground="{StaticResource Fg}"
+                              IsChecked="{Binding Options.Grayscale, Mode=TwoWay}"/>
+                    <DockPanel Margin="0,10,0,0">
+                        <TextBlock Text="비트뎁스" Style="{StaticResource FieldLabel}"/>
+                        <ComboBox ItemsSource="{Binding BitDepthOptions}"
+                                  SelectedItem="{Binding Options.BitDepth, Mode=TwoWay}"/>
+                    </DockPanel>
+                </StackPanel>
+            </ScrollViewer>
+
+            <Rectangle Grid.Column="3" Width="1" Fill="{StaticResource Border}" Margin="0,12"/>
+
+            <!-- save + preview + run -->
+            <DockPanel Grid.Column="4" Margin="12">
+                <TextBlock DockPanel.Dock="Top" Text="저장 위치" Style="{StaticResource SectionHeader}"/>
+                <CheckBox DockPanel.Dock="Top" Content="변환할 때마다 저장 위치 묻기"
+                          Foreground="{StaticResource Fg}" IsChecked="{Binding AskEachTime}"/>
+                <Grid DockPanel.Dock="Top" Margin="0,8,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBox Grid.Column="0" Text="{Binding OutputFolder, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                    <Button Grid.Column="1" Content="찾아보기" Margin="6,0,0,0" Command="{Binding PickOutputFolderCommand}"/>
+                </Grid>
+                <TextBlock DockPanel.Dock="Top" Margin="2,6,0,0" FontSize="11" Foreground="{StaticResource FgDim}"
+                           TextWrapping="Wrap"
+                           Text="'묻기'를 끄면 이 폴더에 원본이름.새확장자로 바로 저장합니다 (이름 충돌 시 (1), (2))."/>
+
+                <StackPanel DockPanel.Dock="Bottom" Margin="0,10,0,0">
+                    <TextBlock Text="{Binding Summary}" Foreground="{StaticResource FgDim}" Margin="0,0,0,8"/>
+                    <StackPanel Orientation="Horizontal">
+                        <Button Content="전체 변환" Command="{Binding ConvertAllCommand}"
+                                Background="{StaticResource Accent}" Padding="16,6"/>
+                        <Button Content="취소" Command="{Binding CancelCommand}"
+                                IsEnabled="{Binding IsConverting}" Padding="16,6"/>
+                    </StackPanel>
+                </StackPanel>
+
+                <Border Background="{StaticResource Panel}" BorderBrush="{StaticResource Border}" BorderThickness="1"
+                        CornerRadius="4" Margin="0,14,0,0">
+                    <Grid MinHeight="140">
+                        <TextBlock Text="선택한 이미지 미리보기" Foreground="{StaticResource FgDim}" FontSize="11"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding PreviewImage}" Value="{x:Null}">
+                                            <Setter Property="Visibility" Value="Visible"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                        <Image Source="{Binding PreviewImage}" Margin="8" Stretch="Uniform"/>
+                    </Grid>
+                </Border>
+            </DockPanel>
+        </Grid>
+
+    </Grid>
+</UserControl>

@@ -1,0 +1,44 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The optional Cognex .idb codec. It compiles two ways:
+      - VisionPro present at the HintPath  -> COGNEX is defined, the real CogImageFile code builds
+      - VisionPro absent (build server etc.) -> the stub builds, CanDecode/CanEncode return false
+    Either way the assembly is produced, so `dotnet build VisionSupport.sln` is green everywhere.
+    The shell copies the built DLL into plugins\ and loads it by reflection (CognexCodecLoader).
+  -->
+
+  <PropertyGroup>
+    <TargetFramework>net9.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <PlatformTarget>x64</PlatformTarget>
+    <AssemblyName>VisionSupport.ImageConverter.Cognex</AssemblyName>
+    <RootNamespace>VisionSupport.ImageConverter.Cognex</RootNamespace>
+    <CognexBin>$(ProgramFiles)\Cognex\VisionPro\bin</CognexBin>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="Exists('$(CognexBin)\Cognex.VisionPro.Core.dll')">
+    <DefineConstants>$(DefineConstants);COGNEX</DefineConstants>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\VisionSupport.ImageConverter\VisionSupport.ImageConverter.csproj" />
+  </ItemGroup>
+
+  <ItemGroup Condition="Exists('$(CognexBin)\Cognex.VisionPro.Core.dll')">
+    <Reference Include="Cognex.VisionPro.Core">
+      <HintPath>$(CognexBin)\Cognex.VisionPro.Core.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Cognex.VisionPro.ImageFile">
+      <HintPath>$(CognexBin)\Cognex.VisionPro.ImageFile.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <!-- CogImage.ToBitmap() and the CogImage ctors work in System.Drawing.Bitmap. -->
+    <PackageReference Include="System.Drawing.Common" Version="9.0.0" />
+  </ItemGroup>
+
+</Project>

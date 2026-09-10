@@ -1,0 +1,17 @@
+<Application x:Class="VisionSupport.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:shell="clr-namespace:VisionSupport.Shell">
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="Theme/Dark.xaml"/>
+            </ResourceDictionary.MergedDictionaries>
+
+            <shell:StateBrushConverter x:Key="StateBrush"/>
+            <shell:StateTextConverter x:Key="StateText"/>
+            <shell:BoolToVisibilityConverter x:Key="BoolToVis"/>
+            <shell:EmptyToVisibilityConverter x:Key="EmptyToVis"/>
+        </ResourceDictionary>
+    </Application.Resources>
+</Application>

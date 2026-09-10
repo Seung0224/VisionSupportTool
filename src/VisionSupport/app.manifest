@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<assembly manifestVersion="1.0" xmlns="urn:schemas-microsoft-com:asm.v1">
+  <assemblyIdentity version="1.0.0.0" name="VisionSupport.app"/>
+
+  <!--
+    The memory monitor runs inside this process, and two of the things it does cannot be done
+    without administrator rights:
+      - reading a target that itself runs elevated (VISION does), and
+      - creating the ETW sessions behind the GC pause and native allocation views.
+    Privilege is per-process, so hosting that feature in-process means the whole shell must be
+    elevated. Asking for it up front avoids the confusing half-working state where processes
+    are listed but cannot be attached to.
+  -->
+  <trustInfo xmlns="urn:schemas-microsoft-com:asm.v2">
+    <security>
+      <requestedPrivileges xmlns="urn:schemas-microsoft-com:asm.v3">
+        <requestedExecutionLevel level="requireAdministrator" uiAccess="false" />
+      </requestedPrivileges>
+    </security>
+  </trustInfo>
+</assembly>
