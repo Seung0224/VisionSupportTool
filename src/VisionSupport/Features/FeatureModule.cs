@@ -36,6 +36,10 @@ public abstract class FeatureModule : IFeatureModule
 
     public virtual string StatusLine => string.Empty;
 
+    public virtual string Glyph => "";
+
+    public virtual Size PreferredWindowSize => new(1100, 720);
+
     public FeatureState State
     {
         get => _state;
@@ -56,6 +60,33 @@ public abstract class FeatureModule : IFeatureModule
     protected CancellationToken RunToken => _cts?.Token ?? CancellationToken.None;
 
     public UserControl GetOrCreateView() => _view ??= CreateView();
+
+    /// <summary>
+    /// Drops the view and everything hanging off it, leaving the feature running.
+    ///
+    /// Detail windows go with it: they read live state out of the feature, and one left behind
+    /// after its parent window closed is a floating panel with no way back to what opened it.
+    /// The view's DataContext is deliberately not disposed here - that is the feature's own
+    /// ViewModel, and it is the thing being kept alive.
+    /// </summary>
+    public void ReleaseView()
+    {
+        foreach (Window window in _ownedWindows.ToArray())
+        {
+            try
+            {
+                window.Close();
+            }
+            catch
+            {
+                // A window already closing throws; nothing here is worth failing over.
+            }
+        }
+        _ownedWindows.Clear();
+
+        (_view as IDisposable)?.Dispose();
+        _view = null;
+    }
 
     public async Task StartAsync()
     {
@@ -225,21 +256,6 @@ public abstract class FeatureModule : IFeatureModule
             clean = false;
         }
 
-        // Close windows even if the feature's own teardown failed - they are the most visible
-        // leftover, and leaving them open makes a stopped feature look like it is still running.
-        foreach (Window window in _ownedWindows.ToArray())
-        {
-            try
-            {
-                window.Close();
-            }
-            catch
-            {
-                // A window already closing throws; nothing here is worth failing teardown over.
-            }
-        }
-        _ownedWindows.Clear();
-
         try
         {
             _cts?.Dispose();
@@ -250,11 +266,12 @@ public abstract class FeatureModule : IFeatureModule
         }
         _cts = null;
 
-        // Drop the view so the next navigation builds a fresh one. Keeping it would show the
-        // last chart and the last node table as if they were still live.
-        (_view as IDisposable)?.Dispose();
+        // Dispose the ViewModel first, then hand the rest to ReleaseView: a full stop is a view
+        // release plus letting go of what the view was showing. The windows close even if the
+        // feature's own teardown failed - they are the most visible leftover, and leaving them
+        // open makes a stopped feature look like it is still running.
         (_view?.DataContext as IDisposable)?.Dispose();
-        _view = null;
+        ReleaseView();
 
         return clean;
     }

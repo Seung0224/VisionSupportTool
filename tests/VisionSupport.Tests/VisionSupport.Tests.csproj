@@ -20,6 +20,15 @@
     <ProjectReference Include="..\..\src\VisionSupport.PlcServer\VisionSupport.PlcServer.csproj" />
     <ProjectReference Include="..\..\src\VisionSupport.MemoryMonitor\VisionSupport.MemoryMonitor.csproj" />
     <ProjectReference Include="..\..\src\VisionSupport.ImageConverter\VisionSupport.ImageConverter.csproj" />
+    <ProjectReference Include="..\..\src\VisionSupport\VisionSupport.csproj" />
   </ItemGroup>
+
+  <!-- The shell copies the optional Cognex codec into plugins\, and referencing the shell drags
+       that copy in here too. CognexCodecLoader looks for the plugin next to the running binary,
+       so its "plugin is absent" test would be checking a machine where the plugin is present.
+       The test host is not the shell and has no use for the plugin either way. -->
+  <Target Name="DropShellPluginFromTestOutput" AfterTargets="Build">
+    <Delete Files="$(OutputPath)plugins\VisionSupport.ImageConverter.Cognex.dll" ContinueOnError="true"/>
+  </Target>
 
 </Project>

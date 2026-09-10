@@ -1,3 +1,4 @@
+using System.Windows;
 using System.Windows.Controls;
 
 namespace VisionSupport.Features;
@@ -43,6 +44,22 @@ public interface IFeatureModule
     /// stop builds a fresh one.
     /// </summary>
     UserControl GetOrCreateView();
+
+    /// <summary>Radial menu tile icon. One Segoe MDL2 Assets character.</summary>
+    string Glyph { get; }
+
+    /// <summary>Opening size of this feature's window.</summary>
+    Size PreferredWindowSize { get; }
+
+    /// <summary>
+    /// Drops the feature's UI without touching what it is running.
+    ///
+    /// This is what closing a feature's window does while the feature is still up: servers, ETW
+    /// sessions and sampling timers carry on, but every pixel the feature owns goes away and is
+    /// rebuilt from scratch on the next visit. Without this split, closing a window would cut a
+    /// VISION client off mid-test.
+    /// </summary>
+    void ReleaseView();
 
     Task StartAsync();
 

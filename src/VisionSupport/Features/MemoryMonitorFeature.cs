@@ -1,3 +1,4 @@
+using System.Windows;
 using System.Windows.Controls;
 using MemMon;
 using MemMon.ViewModels;
@@ -21,6 +22,10 @@ public sealed class MemoryMonitorFeature : FeatureModule
 
     public override string Description
         => "대상 프로세스의 관리 힙·GC 일시정지·네이티브 할당을 추적하고 스냅샷을 비교합니다.";
+
+    public override string Glyph => "";
+
+    public override Size PreferredWindowSize => new(1280, 820);
 
     public override string StatusLine => _viewModel?.Status ?? string.Empty;
 
