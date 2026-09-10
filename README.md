@@ -95,25 +95,26 @@ WPF 리소스 조회가 비주얼 트리를 타고 올라가므로, 두 컨트�
 
 ## 불투명도와 둥근 모서리
 
-모든 창은 반투명하다(기본 0.92, 전체보기의 슬라이더로 0.30~1.00 조절). 구현은 `Window.Opacity`가
-아니라 Win32 레이어드 윈도우(`WS_EX_LAYERED` + `SetLayeredWindowAttributes`)다. `Window.Opacity`는
-`AllowsTransparency=true`를 요구하고 그러면 소프트웨어 렌더링 경로로 떨어지는데, 그 비용을 모든
-창이 치르게 된다.
+셸이 소유한 창은 `AllowsTransparency="True"` + `Window.Opacity`로 반투명하다. 창은 **0.95 고정**,
+런처 아이콘은 **0.70 기본**이며 아이콘 쪽만 실행 중에 조절된다.
 
-적용은 `App.OnStartup`의 클래스 핸들러 한 줄이 담당한다.
+한 번 틀렸다가 되돌린 길이 있으니 적어둔다. 처음에는 Win32 레이어드 윈도우
+(`WS_EX_LAYERED` + `SetLayeredWindowAttributes`)로 갔는데, **WPF에서는 동작하지 않는다.** WPF 창은
+DWM 리디렉션 표면을 쓰고, 생성된 뒤에는 Windows가 레이어드 비트를 붙여주지 않는다. 같은 핸들에
+같은 호출로 `WS_EX_TOOLWINDOW`를 걸면 멀쩡히 붙는데 `WS_EX_LAYERED`만 조용히 사라지고, 이어지는
+`SetLayeredWindowAttributes`가 `ERROR_INVALID_PARAMETER`로 실패한다.
 
-```csharp
-EventManager.RegisterClassHandler(typeof(Window), FrameworkElement.LoadedEvent, ...)
-```
+`AllowsTransparency`가 WPF가 그 모드로 들어가는 자기 방식이고, **창을 띄우기 전에만** 지정할 수
+있다. 그래서 `FeatureWindow.xaml` / `OverviewDialog.xaml`의 마크업에 박혀 있고, 런타임에 바꿀 수
+있는 값이 아니다.
 
-프로세스 안 모든 `Window`의 `Loaded`를 잡으므로 기능 프로젝트의 다이얼로그(`AddModuleDialog`,
-`PlcMonitorWindow`, `GcReferenceWindow` …)까지 그 프로젝트를 고치지 않고 전부 적용된다. 기능은
-셸을 모른다는 대칭이 유지되는 이유다. 런처 창만 예외로, 원형 모양 때문에 진짜 모양 투명이
-필요해서 레이어드 알파를 걸지 않는다.
+여기서 딸려온 이득이 모서리다. 투명한 창은 `Border`의 `CornerRadius`가 그대로 바깥 모서리가
+되므로, 예전에 쓰던 `SetWindowRgn` 리전 컷과 그 Win10 계단 현상, Win11/Win10 분기가 전부
+사라졌다. 최대화 때만 반경을 0으로 되돌린다.
 
-모서리는 Win11이면 DWM의 `DWMWA_WINDOW_CORNER_PREFERENCE`, Win10이면 `SetWindowRgn`으로 HWND를
-직접 둥글게 자른다. Win10 쪽은 안티에일리어싱이 없어 모서리에 약간 계단이 보이는데, 이건 GPU
-가속을 지키기 위한 절충이다. 두 경로 다 `Windows/WindowEffects.cs`에 있다.
+**기능 프로젝트가 여는 다이얼로그**(`AddModuleDialog`, `PlcMonitorWindow`, `GcReferenceWindow` …)는
+불투명하게 남는다. `AllowsTransparency`를 나중에 켤 수 없고, 그 창들은 이 프로젝트가 건드리지
+않는 어셈블리 안에 있다.
 
 ## 관리자 권한
 

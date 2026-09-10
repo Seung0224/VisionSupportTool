@@ -79,6 +79,12 @@ public sealed partial class LauncherViewModel : ObservableObject
     /// where they are changed.</summary>
     public LauncherAppearance Appearance { get; }
 
+    /// <summary>
+    /// Asks the menu to shut instantly rather than animate out. Raised just before something
+    /// expensive is built on the UI thread, which an in-flight animation would stutter through.
+    /// </summary>
+    public event EventHandler? CollapseNowRequested;
+
     /// <summary>Drives the ring around the icon: something is up even with every window closed.</summary>
     public bool AnyRunning => _modules.Any(m => m.State is FeatureState.Running
                                                        or FeatureState.Starting
@@ -87,7 +93,7 @@ public sealed partial class LauncherViewModel : ObservableObject
     [RelayCommand]
     public void ShowOverview()
     {
-        IsExpanded = false;
+        CollapseNowRequested?.Invoke(this, EventArgs.Empty);
 
         if (_overview is not null)
         {
@@ -122,7 +128,7 @@ public sealed partial class LauncherViewModel : ObservableObject
 
     private void Open(IFeatureModule module)
     {
-        IsExpanded = false;
+        CollapseNowRequested?.Invoke(this, EventArgs.Empty);
 
         if (_open.TryGetValue(module, out FeatureWindow? existing))
         {

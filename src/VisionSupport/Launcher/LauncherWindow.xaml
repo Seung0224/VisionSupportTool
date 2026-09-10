@@ -26,13 +26,19 @@
                             </Grid.RenderTransform>
 
                             <Border x:Name="Chrome" CornerRadius="{StaticResource RadiusTile}"
-                                    Background="#FF2F3136" BorderThickness="1"
-                                    BorderBrush="#FF44474D">
+                                    Background="{TemplateBinding Background}" BorderThickness="1"
+                                    BorderBrush="{TemplateBinding BorderBrush}">
                                 <Border.Effect>
                                     <DropShadowEffect BlurRadius="14" ShadowDepth="3"
                                                       Direction="270" Opacity="0.55" Color="Black"/>
                                 </Border.Effect>
                             </Border>
+
+                            <!-- Hover brightens with a white wash rather than a second colour, so
+                                 the highlight follows whatever hue the user picked instead of
+                                 needing its own palette entry. -->
+                            <Border x:Name="Glow" CornerRadius="{StaticResource RadiusTile}"
+                                    Background="White" Opacity="0"/>
 
                             <!-- The running ring. A feature can be up with no window open, and
                                  this is the only place that says so at a glance. -->
@@ -46,8 +52,6 @@
 
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Chrome" Property="Background" Value="{StaticResource Accent}"/>
-                                <Setter TargetName="Chrome" Property="BorderBrush" Value="{StaticResource AccentBright}"/>
                                 <Trigger.EnterActions>
                                     <BeginStoryboard>
                                         <Storyboard>
@@ -57,6 +61,9 @@
                                             <DoubleAnimation Storyboard.TargetName="Zoom"
                                                              Storyboard.TargetProperty="ScaleY"
                                                              To="1.12" Duration="0:0:0.12"/>
+                                            <DoubleAnimation Storyboard.TargetName="Glow"
+                                                             Storyboard.TargetProperty="Opacity"
+                                                             To="0.20" Duration="0:0:0.12"/>
                                         </Storyboard>
                                     </BeginStoryboard>
                                 </Trigger.EnterActions>
@@ -69,6 +76,9 @@
                                             <DoubleAnimation Storyboard.TargetName="Zoom"
                                                              Storyboard.TargetProperty="ScaleY"
                                                              To="1" Duration="0:0:0.16"/>
+                                            <DoubleAnimation Storyboard.TargetName="Glow"
+                                                             Storyboard.TargetProperty="Opacity"
+                                                             To="0" Duration="0:0:0.16"/>
                                         </Storyboard>
                                     </BeginStoryboard>
                                 </Trigger.ExitActions>
@@ -113,8 +123,13 @@
          clicks in the empty area around the icon reach whatever is behind the launcher. -->
     <Grid Background="{x:Null}">
 
+        <!-- Cached as a bitmap for the open/close animation. A transparent window renders in
+             software, and scaling four tiles - each with a drop shadow, a vector icon and a
+             label - re-rasterises all of that on every frame. Cached, the animation scales one
+             ready-made bitmap instead, which is the difference between stuttering and smooth. -->
         <ItemsControl x:Name="Menu" ItemsSource="{Binding Items}" Visibility="Collapsed"
-                      Opacity="0" RenderTransformOrigin="0.5,0.5">
+                      Opacity="0" RenderTransformOrigin="0.5,0.5"
+                      CacheMode="BitmapCache">
             <ItemsControl.RenderTransform>
                 <ScaleTransform x:Name="MenuScale" ScaleX="0.35" ScaleY="0.35"/>
             </ItemsControl.RenderTransform>
@@ -132,9 +147,15 @@
             <ItemsControl.ItemTemplate>
                 <DataTemplate>
                     <StackPanel Width="88" HorizontalAlignment="Center">
+                        <!-- Tiles wear the same hue as the icon that opened them, so the colour
+                             slider moves the whole launcher rather than just the circle. -->
                         <Button Style="{StaticResource MenuTile}"
                                 Command="{Binding ActivateCommand}"
-                                HorizontalAlignment="Center">
+                                HorizontalAlignment="Center"
+                                Background="{Binding DataContext.Appearance.IconBrush,
+                                            RelativeSource={RelativeSource AncestorType=Window}}"
+                                BorderBrush="{Binding DataContext.Appearance.IconEdgeBrush,
+                                             RelativeSource={RelativeSource AncestorType=Window}}">
                             <icons:PackIconMaterial Kind="{Binding Glyph}" Width="24" Height="24"
                                                     Foreground="White"/>
                         </Button>

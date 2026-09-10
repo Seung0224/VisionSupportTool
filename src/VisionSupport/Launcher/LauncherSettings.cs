@@ -8,9 +8,10 @@ namespace VisionSupport.Launcher;
 /// What the launcher remembers between runs: where the user parked the icon, and how the icon
 /// looks.
 ///
-/// Window translucency is not here. It is fixed at half in the windows' own markup - it has to be
+/// Window translucency is not here. It is fixed at 0.95 in the windows' own markup - it has to be
 /// declared before a window is shown (see FeatureWindow.xaml), so it was never something a
-/// setting could change at runtime anyway.
+/// setting could change at runtime anyway. The icon is the fainter of the two, and the only one
+/// that is adjustable.
 ///
 /// Every read path falls back to a working default rather than throwing. This file is a
 /// convenience; a tool that refuses to start because its preferences are unreadable has turned a
@@ -27,9 +28,13 @@ public sealed class LauncherSettings
     /// that reads as "a tool", not as an alert.</summary>
     public const double DefaultIconHue = 212;
 
-    public const double DefaultIconOpacity = 0.85;
+    /// <summary>
+    /// The icon sits on top of everything the user is actually working on, so it defaults fainter
+    /// than the windows do - present enough to find, faint enough to ignore.
+    /// </summary>
+    public const double DefaultIconOpacity = 0.70;
 
-    public const double DefaultIconSize = 60;
+    public const double DefaultIconSize = 78;
 
     public const double MinIconSize = 36;
 

@@ -4,7 +4,7 @@
         xmlns:chrome="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
         Background="Transparent"
         WindowStyle="None" AllowsTransparency="True"
-        Opacity="0.5"
+        Opacity="0.95"
         WindowStartupLocation="CenterScreen"
         MinWidth="720" MinHeight="480"
         UseLayoutRounding="True">

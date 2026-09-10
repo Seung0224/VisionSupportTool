@@ -2,6 +2,7 @@ using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
+using System.Windows.Threading;
 
 namespace VisionSupport.Launcher;
 
@@ -83,6 +84,8 @@ public partial class LauncherWindow : Window
         // menu that has no dismiss button.
         Deactivated += (_, _) => Collapse();
 
+        viewModel.CollapseNowRequested += (_, _) => Collapse(animate: false);
+
         viewModel.PropertyChanged += (_, e) =>
         {
             if (e.PropertyName == nameof(LauncherViewModel.IsExpanded) && !viewModel.IsExpanded)
@@ -160,23 +163,58 @@ public partial class LauncherWindow : Window
         AnimateFabAngle(180);
     }
 
-    private void Collapse()
+    /// <param name="animate">
+    /// False when something heavy is about to be built on this thread - opening a feature window
+    /// blocks for as long as its view takes to construct, and an animation playing into that
+    /// freezes halfway and jumps. Closing at once looks deliberate; stuttering does not.
+    /// </param>
+    private void Collapse(bool animate = true)
     {
         if (!_menuOpen) return;
 
         _menuOpen = false;
         ViewModel.IsExpanded = false;
-
         int token = ++_animationToken;
-        AnimateMenu(FoldedScale, 0.0, new CubicEase { EasingMode = EasingMode.EaseIn }, 170, () =>
+
+        if (animate)
+        {
+            AnimateMenu(FoldedScale, 0.0, new CubicEase { EasingMode = EasingMode.EaseIn }, 170,
+                        () => FinishCollapse(token));
+        }
+        else
+        {
+            // Hand the properties back from the animations before setting them, or the animation
+            // clock keeps its hold and the values are ignored.
+            MenuScale.BeginAnimation(ScaleTransform.ScaleXProperty, null);
+            MenuScale.BeginAnimation(ScaleTransform.ScaleYProperty, null);
+            Menu.BeginAnimation(OpacityProperty, null);
+            MenuScale.ScaleX = FoldedScale;
+            MenuScale.ScaleY = FoldedScale;
+            Menu.Opacity = 0;
+
+            FinishCollapse(token);
+        }
+
+        AnimateFabAngle(0);
+    }
+
+    private void FinishCollapse(int token)
+    {
+        if (token != _animationToken) return;
+
+        Menu.Visibility = Visibility.Collapsed;
+
+        // Shrink on a later pass, once the hidden menu has actually been painted away. Resizing a
+        // transparent window in the same breath as hiding its content leaves the old pixels
+        // sitting on the desktop until something else happens to repaint over them - the trail
+        // that looks like the menu is still half there.
+        Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() =>
         {
             if (token != _animationToken) return;
 
-            Menu.Visibility = Visibility.Collapsed;
             Resize(CollapsedSize);
             RememberPosition();
-        });
-        AnimateFabAngle(0);
+        }));
     }
 
     private void AnimateMenu(double scale, double opacity, IEasingFunction ease, int milliseconds,
@@ -242,8 +280,18 @@ public partial class LauncherWindow : Window
         Top = Math.Clamp(Top, minTop, Math.Max(minTop, maxTop));
     }
 
+    /// <summary>
+    /// Saves the icon's position, but only when it has actually moved. This runs at the end of
+    /// every collapse, and a settings file rewritten on the UI thread every time the menu closes
+    /// is a disk write in the middle of an animation.
+    /// </summary>
     private void RememberPosition()
     {
+        if (Math.Abs(_settings.IconLeft - Left) < 0.5 && Math.Abs(_settings.IconTop - Top) < 0.5)
+        {
+            return;
+        }
+
         _settings.IconLeft = Left;
         _settings.IconTop = Top;
         _settings.Save(LauncherSettings.DefaultPath);
