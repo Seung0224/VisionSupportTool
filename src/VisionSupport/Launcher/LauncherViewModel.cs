@@ -191,8 +191,18 @@ public sealed partial class LauncherViewModel : ObservableObject
             return;
         }
 
-        BrowserLauncher.OpenPopup(link.Url, link.Width, link.Height);
-        _activity.Add(link.Title, "열기");
+        // The route is logged because the rungs below "popup" are the ones that produce a
+        // support question - a tab instead of a window, or a sign-in page instead of the page -
+        // and this is the only place that knows which one happened.
+        BrowserLauncher.Route route = BrowserLauncher.OpenPopup(link.Url, link.Width, link.Height);
+
+        _activity.Add(link.Title, route switch
+        {
+            BrowserLauncher.Route.Popup => "열기 (팝업)",
+            BrowserLauncher.Route.Tab => "열기 (탭 — 팝업 실패)",
+            BrowserLauncher.Route.ElevatedTab => "열기 (관리자 브라우저 — 로그인이 풀릴 수 있음)",
+            _ => "열기 실패 — 주소를 확인하세요",
+        });
     }
 
     private void Open(IFeatureModule module)

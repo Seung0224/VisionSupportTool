@@ -22,49 +22,91 @@ namespace VisionSupport.Launcher;
 /// </summary>
 public static class BrowserLauncher
 {
-    /// <summary>Chromium builds that understand --app. Firefox has no equivalent.</summary>
-    private static readonly string[] AppWindowBrowsers =
-        { "msedge.exe", "chrome.exe", "brave.exe", "vivaldi.exe", "opera.exe", "chromium.exe" };
-
     /// <summary>
-    /// Opens <paramref name="url"/> in a browser window of its own, falling back to a tab if
-    /// anything about the popup path does not hold on this machine.
+    /// Chromium builds that understand --app. Firefox has no equivalent and falls to a tab.
+    ///
+    /// Whale is on this list for a reason worth remembering: it is Chromium underneath and
+    /// handles --app perfectly well, but being absent here made it look like a browser that
+    /// could not, and the link quietly opened a File Explorer window instead. Anything Chromium
+    /// that turns up as someone's default belongs here.
     /// </summary>
-    public static void OpenPopup(string url, int width, int height)
+    private static readonly string[] AppWindowBrowsers =
     {
-        try
-        {
-            string? browser = FindDefaultBrowser();
-            if (browser is not null && SupportsAppWindow(browser))
-            {
-                string command = $"\"{browser}\" {BuildPopupArguments(url, width, height)}";
-                if (StartUnelevated(command)) return;
-            }
-        }
-        catch (Exception ex) when (ex is not OutOfMemoryException)
-        {
-            // Every step below is best-effort: an unreadable registry, a browser that moved, a
-            // token that cannot be duplicated. None of them are worth failing the click over
-            // when opening a tab still gets the user to the page.
-        }
+        "msedge.exe", "chrome.exe", "whale.exe", "brave.exe",
+        "vivaldi.exe", "opera.exe", "chromium.exe",
+    };
 
-        OpenTab(url);
+    /// <summary>How a link ended up being opened, so the launcher can say so.</summary>
+    public enum Route
+    {
+        /// <summary>A browser window of its own, signed in as the user. What we are aiming for.</summary>
+        Popup,
+
+        /// <summary>A tab in the user's own browser. Right session, wrong shape.</summary>
+        Tab,
+
+        /// <summary>A tab in a browser started by this elevated process - a different profile,
+        /// so an intranet page may ask to sign in.</summary>
+        ElevatedTab,
+
+        /// <summary>Nothing worked.</summary>
+        Failed,
     }
 
     /// <summary>
-    /// Hands the URL to the desktop shell, which opens it in the default browser at the shell's
-    /// own privilege level. The plain fallback: a tab rather than a window.
+    /// Opens <paramref name="url"/>, trying hardest first and settling for less rather than
+    /// failing. Each rung down loses something the user will notice, which is why the caller is
+    /// told which one it landed on.
     /// </summary>
-    private static void OpenTab(string url)
+    public static Route OpenPopup(string url, int width, int height)
+    {
+        if (string.IsNullOrWhiteSpace(url)) return Route.Failed;
+
+        if (Try(() =>
+        {
+            string? browser = FindDefaultBrowser();
+            if (browser is null || !SupportsAppWindow(browser)) return false;
+
+            return StartUnelevated($"\"{browser}\" {BuildPopupArguments(url, width, height)}");
+        }))
+        {
+            return Route.Popup;
+        }
+
+        // The shell opens it at the shell's own privilege level, so the browser is the ordinary
+        // one with the ordinary cookies. The URL is quoted: a query string reaches explorer
+        // whole, and an unquoted one has been seen to make it open a folder window instead.
+        if (Try(() => Process.Start(
+                new ProcessStartInfo("explorer.exe", $"\"{url}\"") { UseShellExecute = false }) is not null))
+        {
+            return Route.Tab;
+        }
+
+        // Last resort. ShellExecute always finds the default browser, but the browser inherits
+        // this process's elevation and with it a separate profile - the page opens, and a site
+        // behind single sign-on may well ask who you are.
+        if (Try(() => Process.Start(new ProcessStartInfo(url) { UseShellExecute = true }) is not null))
+        {
+            return Route.ElevatedTab;
+        }
+
+        return Route.Failed;
+    }
+
+    /// <summary>
+    /// Runs one rung of the ladder, treating any failure as "did not work" rather than letting it
+    /// out. An unreadable registry, a browser that moved, a token that cannot be duplicated - all
+    /// of them mean the same thing here: try the next thing.
+    /// </summary>
+    private static bool Try(Func<bool> attempt)
     {
         try
         {
-            Process.Start(new ProcessStartInfo("explorer.exe", url) { UseShellExecute = false });
+            return attempt();
         }
-        catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception)
+        catch (Exception ex) when (ex is not OutOfMemoryException)
         {
-            // Nothing left to try. A menu tile that quietly does nothing beats one that takes the
-            // launcher down with it.
+            return false;
         }
     }
 

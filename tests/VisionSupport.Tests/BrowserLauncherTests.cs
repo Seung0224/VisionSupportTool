@@ -32,6 +32,8 @@ public class BrowserLauncherTests
     [InlineData("C:\\x\\msedge.exe", true)]
     [InlineData("C:\\x\\CHROME.EXE", true)]
     [InlineData("C:\\x\\brave.exe", true)]
+    // Whale: Chromium underneath, and the one whose absence sent a link to File Explorer.
+    [InlineData("C:\\Program Files\\Naver\\Naver Whale\\Application\\whale.exe", true)]
     [InlineData("C:\\x\\firefox.exe", false)]
     [InlineData("", false)]
     public void Knows_which_browsers_can_open_an_app_window(string path, bool expected)
