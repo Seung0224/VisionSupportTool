@@ -128,8 +128,13 @@
              label - re-rasterises all of that on every frame. Cached, the animation scales one
              ready-made bitmap instead, which is the difference between stuttering and smooth. -->
         <ItemsControl x:Name="Menu" ItemsSource="{Binding Items}" Visibility="Collapsed"
-                      Opacity="0" RenderTransformOrigin="0.5,0.5"
-                      CacheMode="BitmapCache">
+                      Opacity="0" RenderTransformOrigin="0.5,0.5">
+            <!-- RenderAtScale is set from the monitor's scaling in code. Left at 1 the bitmap is
+                 baked at device-independent size and then stretched by the DPI factor, which is
+                 what made the tiles look softened at the edges. -->
+            <ItemsControl.CacheMode>
+                <BitmapCache x:Name="MenuCache" RenderAtScale="1"/>
+            </ItemsControl.CacheMode>
             <ItemsControl.RenderTransform>
                 <ScaleTransform x:Name="MenuScale" ScaleX="0.35" ScaleY="0.35"/>
             </ItemsControl.RenderTransform>

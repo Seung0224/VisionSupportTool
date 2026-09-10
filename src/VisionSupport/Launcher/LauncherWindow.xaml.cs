@@ -87,6 +87,9 @@ public partial class LauncherWindow : Window
 
         viewModel.CollapseNowRequested += (_, _) => Collapse(animate: false);
 
+        SourceInitialized += (_, _) => MatchCacheToScreen();
+        DpiChanged += (_, _) => MatchCacheToScreen();
+
         viewModel.PropertyChanged += (_, e) =>
         {
             if (e.PropertyName == nameof(LauncherViewModel.IsExpanded) && !viewModel.IsExpanded)
@@ -99,6 +102,17 @@ public partial class LauncherWindow : Window
     private LauncherViewModel ViewModel => (LauncherViewModel)DataContext;
 
     private double CollapsedSize => ViewModel.Appearance.IconSize + IconMargin * 2;
+
+    /// <summary>
+    /// Bakes the menu's cached bitmap at the monitor's own pixel density.
+    ///
+    /// The cache is what keeps the open/close animation smooth, but a cache rendered at 1.0 on a
+    /// 150% display is three pixels doing the work of four - it is stretched on the way to the
+    /// screen, and the tiles come out looking soft at the edges. Following the DPI keeps the
+    /// bitmap pixel-for-pixel with the display it is drawn on.
+    /// </summary>
+    private void MatchCacheToScreen()
+        => MenuCache.RenderAtScale = VisualTreeHelper.GetDpi(this).DpiScaleX;
 
     private void OnFabPressed(object sender, MouseButtonEventArgs e)
     {
@@ -122,8 +136,8 @@ public partial class LauncherWindow : Window
         // Screen pixels to DIPs: on a 150% monitor the window would otherwise run 1.5x ahead of
         // the pointer.
         double scale = VisualTreeHelper.GetDpi(this).DpiScaleX;
-        Left = _pressWindowOrigin.X + moved.X / scale;
-        Top = _pressWindowOrigin.Y + moved.Y / scale;
+        Left = Math.Round(_pressWindowOrigin.X + moved.X / scale);
+        Top = Math.Round(_pressWindowOrigin.Y + moved.Y / scale);
     }
 
     private void OnFabReleased(object sender, MouseButtonEventArgs e)
@@ -156,11 +170,10 @@ public partial class LauncherWindow : Window
 
         Menu.Visibility = Visibility.Visible;
 
-        // A little overshoot on the way out is what makes it read as "sprung open" rather than
-        // "resized". Coming back in it eases straight, because an overshoot on the way to nothing
-        // just looks like a stutter.
-        AnimateMenu(1.0, 1.0, new BackEase { EasingMode = EasingMode.EaseOut, Amplitude = 0.45 },
-                    260, onDone: null);
+        // Decelerating, with no overshoot. A springy ease sends every tile past its resting place
+        // and back, and because the places are arranged in a circle that reads as the whole menu
+        // scattering outwards rather than as one thing springing open.
+        AnimateMenu(1.0, 1.0, new CubicEase { EasingMode = EasingMode.EaseOut }, 240, onDone: null);
         AnimateFabAngle(180);
     }
 
@@ -254,16 +267,23 @@ public partial class LauncherWindow : Window
             new DoubleAnimation(scale, duration) { EasingFunction = ease });
     }
 
-    /// <summary>Resizes around the icon's centre, so growing the window does not move the icon.</summary>
+    /// <summary>
+    /// Resizes around the icon's centre, so growing the window does not move the icon.
+    ///
+    /// Everything is rounded to whole pixels. A transparent window sitting on a half pixel is
+    /// resampled onto the screen grid, and every edge in it - the circle, the tiles, the letter -
+    /// comes out soft. Half a pixel is all it takes, and the icon size comes off a slider.
+    /// </summary>
     private void Resize(double size)
     {
+        double whole = Math.Round(size);
         double centreX = Left + Width / 2;
         double centreY = Top + Height / 2;
 
-        Width = size;
-        Height = size;
-        Left = centreX - size / 2;
-        Top = centreY - size / 2;
+        Width = whole;
+        Height = whole;
+        Left = Math.Round(centreX - whole / 2);
+        Top = Math.Round(centreY - whole / 2);
     }
 
     /// <summary>
@@ -277,8 +297,8 @@ public partial class LauncherWindow : Window
         double maxLeft = minLeft + SystemParameters.VirtualScreenWidth - Width;
         double maxTop = minTop + SystemParameters.VirtualScreenHeight - Height;
 
-        Left = Math.Clamp(Left, minLeft, Math.Max(minLeft, maxLeft));
-        Top = Math.Clamp(Top, minTop, Math.Max(minTop, maxTop));
+        Left = Math.Round(Math.Clamp(Left, minLeft, Math.Max(minLeft, maxLeft)));
+        Top = Math.Round(Math.Clamp(Top, minTop, Math.Max(minTop, maxTop)));
     }
 
     /// <summary>

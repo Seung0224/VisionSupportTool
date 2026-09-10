@@ -60,7 +60,9 @@ public sealed partial class LauncherAppearance : ObservableObject
         get => _settings.IconSize;
         set
         {
-            double clamped = LauncherSettings.ClampIconSize(value);
+            // Whole pixels only. A 61.4px circle lands the window on a half pixel, and a
+            // transparent window off the pixel grid is resampled and looks soft.
+            double clamped = Math.Round(LauncherSettings.ClampIconSize(value));
             if (Nearly(_settings.IconSize, clamped)) return;
 
             _settings.IconSize = clamped;
