@@ -48,6 +48,11 @@ public sealed partial class LauncherViewModel : ObservableObject
 
         Links = new ObservableCollection<LauncherLink>(settings.Links ?? LauncherLink.Defaults());
 
+        // Rebuild as soon as a link is added or removed, not when the editor is closed. Adding a
+        // tile and finding the menu unchanged reads as "it did not work", and the editor is
+        // modeless - there is no moment where the user has agreed to be finished.
+        Links.CollectionChanged += (_, _) => RebuildItems();
+
         // Both sizes move the ring: the tile's directly, the icon's through the clearance the
         // ring keeps from it.
         appearance.PropertyChanged += (_, e) =>
@@ -183,9 +188,31 @@ public sealed partial class LauncherViewModel : ObservableObject
         _links.Show();
     }
 
-    private void OpenLink(LauncherLink link)
+    /// <summary>
+    /// Opens a link's target off the UI thread.
+    ///
+    /// Starting a process takes a few hundred milliseconds, and reading the default browser out
+    /// of the registry adds to it. Done here on the dispatcher, the launcher freezes for exactly
+    /// that long right after the click - which is the moment the user is watching it. The work is
+    /// handed to the pool and only the log line comes back.
+    /// </summary>
+    private async void OpenLink(LauncherLink link)
     {
         CollapseNowRequested?.Invoke(this, EventArgs.Empty);
+
+        if (link.Kind == LinkKind.Folder)
+        {
+            string path = link.Url;
+            FolderLauncher.Result opened = await Task.Run(() => FolderLauncher.Open(path));
+
+            _activity.Add(link.Title, opened switch
+            {
+                FolderLauncher.Result.Opened => "폴더 열기",
+                FolderLauncher.Result.Missing => $"폴더를 찾을 수 없습니다 — {path}",
+                _ => "폴더 열기 실패",
+            });
+            return;
+        }
 
         if (string.IsNullOrWhiteSpace(link.Url))
         {
@@ -196,7 +223,8 @@ public sealed partial class LauncherViewModel : ObservableObject
         // The route is logged because the rungs below "popup" are the ones that produce a
         // support question - a tab instead of a window, or a sign-in page instead of the page -
         // and this is the only place that knows which one happened.
-        BrowserLauncher.Route route = BrowserLauncher.OpenPopup(link.Url, link.Width, link.Height);
+        (string url, int width, int height) = (link.Url, link.Width, link.Height);
+        BrowserLauncher.Route route = await Task.Run(() => BrowserLauncher.OpenPopup(url, width, height));
 
         _activity.Add(link.Title, route switch
         {

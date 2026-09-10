@@ -46,10 +46,19 @@ public sealed class StateTextConverter : IValueConverter
         => throw new NotSupportedException();
 }
 
+/// <summary>
+/// True shows, false hides. Pass "invert" as the converter parameter to swap that, for the rows
+/// that appear when a flag is off rather than on.
+/// </summary>
 public sealed class BoolToVisibilityConverter : IValueConverter
 {
     public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
-        => value is true ? Visibility.Visible : Visibility.Collapsed;
+    {
+        bool show = value is true;
+        if (parameter as string == "invert") show = !show;
+
+        return show ? Visibility.Visible : Visibility.Collapsed;
+    }
 
     public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
         => throw new NotSupportedException();

@@ -45,4 +45,17 @@ public class LauncherIconTests
     [Fact]
     public void The_default_glyph_resolves()
         => Assert.True(Enum.TryParse("None", out PackIconMaterialKind _));
+
+    /// <summary>
+    /// The icons the links editor hands to a tile the user has just made. A name that does not
+    /// resolve leaves the tile blank, and with the captions gone a blank tile says nothing at all.
+    /// </summary>
+    [Theory]
+    [InlineData("OpenInNew")]
+    [InlineData("FolderOutline")]
+    [InlineData("EmailEditOutline")]
+    [InlineData("ViewDashboardOutline")]
+    public void Icons_the_editor_assigns_exist(string glyph)
+        => Assert.True(Enum.TryParse(glyph, out PackIconMaterialKind _),
+            $"'{glyph}' 이(가) PackIconMaterialKind에 없습니다.");
 }

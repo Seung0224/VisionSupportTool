@@ -35,9 +35,17 @@
                 </Grid.ColumnDefinitions>
 
                 <DockPanel Grid.Column="0" Margin="0,0,12,0">
-                    <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Margin="0,8,0,0">
-                        <Button Content="추가" Command="{Binding AddCommand}" MinWidth="60"/>
-                        <Button Content="삭제" Command="{Binding RemoveCommand}" MinWidth="60" Margin="0"/>
+                    <!-- One button per kind rather than an add button and a kind switch: what a
+                         tile points at is decided when it is made, and the two kinds share
+                         nothing that would survive changing your mind. -->
+                    <StackPanel DockPanel.Dock="Bottom" Margin="0,8,0,0">
+                        <StackPanel Orientation="Horizontal">
+                            <Button Content="웹 추가" Command="{Binding AddWebCommand}" MinWidth="72"/>
+                            <Button Content="폴더 추가" Command="{Binding AddFolderCommand}"
+                                    MinWidth="72" Margin="0"/>
+                        </StackPanel>
+                        <Button Content="삭제" Command="{Binding RemoveCommand}"
+                                HorizontalAlignment="Left" MinWidth="72" Margin="0,6,0,0"/>
                     </StackPanel>
 
                     <ListBox ItemsSource="{Binding Links}" SelectedItem="{Binding Selected}"
@@ -51,20 +59,39 @@
                     <TextBox Text="{Binding Title, UpdateSourceTrigger=PropertyChanged}"
                              Margin="0,3,0,10"/>
 
-                    <TextBlock Text="주소" FontSize="11" Foreground="{StaticResource FgDim}"/>
-                    <TextBox Text="{Binding Url, UpdateSourceTrigger=PropertyChanged}"
-                             Margin="0,3,0,10" TextWrapping="Wrap" AcceptsReturn="False"/>
+                    <TextBlock Text="{Binding TargetLabel}" FontSize="11"
+                               Foreground="{StaticResource FgDim}"/>
+                    <Grid Margin="0,3,0,10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBox Grid.Column="0"
+                                 Text="{Binding Url, UpdateSourceTrigger=PropertyChanged}"
+                                 TextWrapping="Wrap" AcceptsReturn="False"/>
+                        <!-- Folders get a picker. A network path typed by hand is where the
+                             typos are, and a wrong one fails silently at the far end. -->
+                        <Button Grid.Column="1" Content="찾아보기" Margin="6,0,0,0" MinWidth="70"
+                                Command="{Binding DataContext.BrowseCommand,
+                                         RelativeSource={RelativeSource AncestorType=Window}}"
+                                Visibility="{Binding IsWeb,
+                                            Converter={StaticResource BoolToVis},
+                                            ConverterParameter=invert}"/>
+                    </Grid>
 
-                    <TextBlock Text="아이콘 (Material Design 이름 &#8212; 예: EmailEditOutline, OpenInNew)"
+                    <TextBlock Text="아이콘 (Material Design 이름 &#8212; 예: EmailEditOutline, FolderOutline)"
                                FontSize="11" Foreground="{StaticResource FgDim}" TextWrapping="Wrap"/>
                     <TextBox Text="{Binding Glyph, UpdateSourceTrigger=PropertyChanged}"
                              Margin="0,3,0,10"/>
 
-                    <TextBlock Text="팝업 창 크기" FontSize="11" Foreground="{StaticResource FgDim}"/>
-                    <StackPanel Orientation="Horizontal" Margin="0,3,0,0">
-                        <TextBox Text="{Binding Width}" Width="70"/>
-                        <TextBlock Text="×" Margin="8,0" Foreground="{StaticResource FgDim}"/>
-                        <TextBox Text="{Binding Height}" Width="70"/>
+                    <!-- A folder opens in Explorer, which sizes its own window. -->
+                    <StackPanel Visibility="{Binding IsWeb, Converter={StaticResource BoolToVis}}">
+                        <TextBlock Text="팝업 창 크기" FontSize="11" Foreground="{StaticResource FgDim}"/>
+                        <StackPanel Orientation="Horizontal" Margin="0,3,0,0">
+                            <TextBox Text="{Binding Width}" Width="70"/>
+                            <TextBlock Text="×" Margin="8,0" Foreground="{StaticResource FgDim}"/>
+                            <TextBox Text="{Binding Height}" Width="70"/>
+                        </StackPanel>
                     </StackPanel>
                 </StackPanel>
             </Grid>
