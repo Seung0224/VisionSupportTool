@@ -30,6 +30,33 @@ VisionSupport.sln
 - 저장 경로는 그대로(`%AppData%\VirtualPlcServer\modules\index.json`). 기존 모듈 설정이
   그대로 이어진다.
 
+## 화면 구조
+
+상시 떠 있는 것은 72×72 원형 아이콘 하나뿐이다. 드래그로 옮길 수 있고, 좌클릭하면 방사형으로
+기능 타일이 펼쳐지며, 우클릭에는 전체보기와 종료가 있다. 기능 창은 아이콘에서 그 기능을 눌렀을
+때 비로소 만들어진다.
+
+```
+LauncherWindow            상시 · Topmost · 작업표시줄 미표시
+ ├ 좌클릭 → 방사형 메뉴    메모리 모니터 · PLC 서버 · 이미지 변환기 · 전체보기
+ └ 우클릭 → 컨텍스트 메뉴  전체보기 · 종료
+
+FeatureWindow × N         기능을 누르면 생성, 닫으면 소멸
+OverviewDialog × 1        프로세스 자원 · 기능별 상태와 정지 · 불투명도
+```
+
+이 구조의 핵심은 **"창"과 "실행"이 다른 것**이라는 점이다. 예전 셸은 페이지에 한 번 들어가면
+뷰와 ViewModel을 프로세스가 끝날 때까지 들고 있었고, 그래서 실행 여부와 자원 점유가 무관했다.
+지금은 창을 닫을 때 기능이 가동 중이 아니면 `StopAsync()`로 전부 해제하고, 가동 중이면
+`ReleaseView()`로 뷰와 상세창만 버린다. PLC 서버에 VISION이 붙어 있는 동안 창을 닫아도 소켓이
+끊기지 않아야 하기 때문이다. 백그라운드로 남은 기능은 런처 아이콘의 초록 링으로 드러나고,
+전체보기에서 내릴 수 있다.
+
+`Application.ShutdownMode`는 `OnExplicitShutdown`이다. 기능 창이 다 닫혀도 런처는 살아 있어야
+하고, 종료는 우클릭 메뉴에서만 일어난다.
+
+앱 위치와 불투명도는 `%AppData%\VisionSupport\launcher.json`에 저장된다.
+
 ## 기능 모듈 계약
 
 기능은 `IFeatureModule` 하나로만 셸과 대화한다. 셸은 기능 내부를, 기능은 셸을 모른다.
@@ -41,6 +68,7 @@ VisionSupport.sln
 | **정지** | 가동 중이던 모듈만 기억하고 내림 (노드 값 유지) | 샘플링만 멈춤 (attach·ETW 세션 유지) | (일시정지 없음 — 버튼 비활성) |
 | **실행**(정지 상태에서) | 기억해 둔 그 모듈들만 다시 기동 | 끊김 없이 이어서 수집 | — |
 | **종료** | 상태 저장 후 전부 정지·해제 | detach + ETW 세션 종료 + 핸들 반납 | 진행 중 배치 취소 + 큐 비우기 + 설정 저장 |
+| **창 닫기** | 가동 중이면 서버는 계속 돌고 뷰만 해제 | 가동 중이면 수집을 이어가고 뷰만 해제 | 가동 상태가 없으므로 항상 전부 해제 |
 
 이미지 변환기는 bmp·png·jpg·gif·tiff·jpeg xr 를 WPF 내장 코덱으로 상호 변환한다(압축 가능한
 포맷은 품질/압축 조절, 그 외 리사이즈·그레이스케일·비트뎁스). 코그넥스 `.idb` 는
@@ -64,6 +92,28 @@ PLC 기능만 예외로 Material 테마를 쓰는데, 이건 `Application.Resour
 WPF 리소스 조회가 비주얼 트리를 타고 올라가므로, 두 컨트롤 테마가 한 프로세스에서
 서로를 덮지 않고 공존한다. 별도 창(`PlcMonitorWindow`, `ScenarioEditorWindow`)은
 자기 비주얼 트리를 가지므로 같은 사전을 각자 머지한다.
+
+## 불투명도와 둥근 모서리
+
+모든 창은 반투명하다(기본 0.92, 전체보기의 슬라이더로 0.30~1.00 조절). 구현은 `Window.Opacity`가
+아니라 Win32 레이어드 윈도우(`WS_EX_LAYERED` + `SetLayeredWindowAttributes`)다. `Window.Opacity`는
+`AllowsTransparency=true`를 요구하고 그러면 소프트웨어 렌더링 경로로 떨어지는데, 그 비용을 모든
+창이 치르게 된다.
+
+적용은 `App.OnStartup`의 클래스 핸들러 한 줄이 담당한다.
+
+```csharp
+EventManager.RegisterClassHandler(typeof(Window), FrameworkElement.LoadedEvent, ...)
+```
+
+프로세스 안 모든 `Window`의 `Loaded`를 잡으므로 기능 프로젝트의 다이얼로그(`AddModuleDialog`,
+`PlcMonitorWindow`, `GcReferenceWindow` …)까지 그 프로젝트를 고치지 않고 전부 적용된다. 기능은
+셸을 모른다는 대칭이 유지되는 이유다. 런처 창만 예외로, 원형 모양 때문에 진짜 모양 투명이
+필요해서 레이어드 알파를 걸지 않는다.
+
+모서리는 Win11이면 DWM의 `DWMWA_WINDOW_CORNER_PREFERENCE`, Win10이면 `SetWindowRgn`으로 HWND를
+직접 둥글게 자른다. Win10 쪽은 안티에일리어싱이 없어 모서리에 약간 계단이 보이는데, 이건 GPU
+가속을 지키기 위한 절충이다. 두 경로 다 `Windows/WindowEffects.cs`에 있다.
 
 ## 관리자 권한
 
