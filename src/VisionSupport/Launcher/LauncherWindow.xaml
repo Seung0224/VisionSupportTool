@@ -12,8 +12,6 @@
              pressed. The cursor deliberately never changes - a shape-shifting pointer over a
              floating widget reads as a resize handle, which this is not. -->
         <Style x:Key="MenuTile" TargetType="Button">
-            <Setter Property="Width" Value="56"/>
-            <Setter Property="Height" Value="56"/>
             <Setter Property="Margin" Value="0"/>
             <Setter Property="Padding" Value="0"/>
             <Setter Property="Focusable" Value="False"/>
@@ -129,12 +127,10 @@
              ready-made bitmap instead, which is the difference between stuttering and smooth. -->
         <ItemsControl x:Name="Menu" ItemsSource="{Binding Items}" Visibility="Collapsed"
                       Opacity="0" RenderTransformOrigin="0.5,0.5">
-            <!-- RenderAtScale is set from the monitor's scaling in code. Left at 1 the bitmap is
-                 baked at device-independent size and then stretched by the DPI factor, which is
-                 what made the tiles look softened at the edges. -->
-            <ItemsControl.CacheMode>
-                <BitmapCache x:Name="MenuCache" RenderAtScale="1"/>
-            </ItemsControl.CacheMode>
+            <!-- No CacheMode here on purpose. A bitmap cache is what keeps the open/close
+                 animation smooth, but leaving one on afterwards means the tiles sit on screen as
+                 a bitmap rather than as vectors, which is what made them look soft. The code
+                 attaches one for the length of the animation and takes it off again. -->
             <ItemsControl.RenderTransform>
                 <ScaleTransform x:Name="MenuScale" ScaleX="0.35" ScaleY="0.35"/>
             </ItemsControl.RenderTransform>
@@ -151,18 +147,27 @@
             </ItemsControl.ItemContainerStyle>
             <ItemsControl.ItemTemplate>
                 <DataTemplate>
-                    <StackPanel Width="88" HorizontalAlignment="Center">
+                    <StackPanel HorizontalAlignment="Center"
+                                Width="{Binding DataContext.Appearance.ItemWidth,
+                                       RelativeSource={RelativeSource AncestorType=Window}}">
                         <!-- Tiles wear the same hue as the icon that opened them, so the colour
                              slider moves the whole launcher rather than just the circle. -->
                         <Button Style="{StaticResource MenuTile}"
                                 Command="{Binding ActivateCommand}"
                                 HorizontalAlignment="Center"
+                                Width="{Binding DataContext.Appearance.TileSize,
+                                       RelativeSource={RelativeSource AncestorType=Window}}"
+                                Height="{Binding DataContext.Appearance.TileSize,
+                                        RelativeSource={RelativeSource AncestorType=Window}}"
                                 Background="{Binding DataContext.Appearance.IconBrush,
                                             RelativeSource={RelativeSource AncestorType=Window}}"
                                 BorderBrush="{Binding DataContext.Appearance.IconEdgeBrush,
                                              RelativeSource={RelativeSource AncestorType=Window}}">
-                            <icons:PackIconMaterial Kind="{Binding Glyph}" Width="24" Height="24"
-                                                    Foreground="White"/>
+                            <icons:PackIconMaterial Kind="{Binding Glyph}" Foreground="White"
+                                Width="{Binding DataContext.Appearance.TileIconSize,
+                                       RelativeSource={RelativeSource AncestorType=Window}}"
+                                Height="{Binding DataContext.Appearance.TileIconSize,
+                                        RelativeSource={RelativeSource AncestorType=Window}}"/>
                         </Button>
 
                         <!-- The label carries its own dark pill: the desktop behind the launcher

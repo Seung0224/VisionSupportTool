@@ -18,17 +18,6 @@ namespace VisionSupport.Launcher;
 /// </summary>
 public sealed partial class LauncherViewModel : ObservableObject
 {
-    /// <summary>The round-square button itself.</summary>
-    public const double TileSize = 56;
-
-    /// <summary>The tile plus the label under it. Wider than the tile, so the label can breathe.</summary>
-    public const double ItemWidth = 88;
-
-    public const double MenuRadius = 112;
-
-    /// <summary>Big enough that a tile at the far edge of the circle, label and all, still fits.</summary>
-    public const double ExpandedSize = 360;
-
     private readonly IReadOnlyList<IFeatureModule> _modules;
     private readonly ActivityLog _activity;
     private readonly LauncherSettings _settings;
@@ -58,6 +47,18 @@ public sealed partial class LauncherViewModel : ObservableObject
         }
 
         Links = new ObservableCollection<LauncherLink>(settings.Links ?? LauncherLink.Defaults());
+
+        // Both sizes move the ring: the tile's directly, the icon's through the clearance the
+        // ring keeps from it.
+        appearance.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName is nameof(LauncherAppearance.TileSize)
+                              or nameof(LauncherAppearance.IconSize))
+            {
+                RebuildItems();
+            }
+        };
+
         RebuildItems();
     }
 
@@ -70,12 +71,13 @@ public sealed partial class LauncherViewModel : ObservableObject
     {
         Items.Clear();
 
-        Point[] offsets = RadialLayout.Offsets(_modules.Count + Links.Count + 1, MenuRadius);
+        Point[] offsets = RadialLayout.Offsets(
+            _modules.Count + Links.Count + 1, Appearance.MenuRadius);
 
         // The tile sits on the circle; the label hangs below it. So the item is centred
         // horizontally on its own width but vertically on the tile's, not the item's.
-        double centreX = ExpandedSize / 2 - ItemWidth / 2;
-        double centreY = ExpandedSize / 2 - TileSize / 2;
+        double centreX = Appearance.MenuSize / 2 - Appearance.ItemWidth / 2;
+        double centreY = Appearance.MenuSize / 2 - Appearance.TileSize / 2;
 
         int slot = 0;
 

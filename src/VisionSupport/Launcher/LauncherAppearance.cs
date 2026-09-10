@@ -68,8 +68,52 @@ public sealed partial class LauncherAppearance : ObservableObject
             _settings.IconSize = clamped;
             OnPropertyChanged();
             OnPropertyChanged(nameof(IconMarkSize));
+
+            // The ring keeps its distance from the icon, so growing the icon can push it out.
+            OnPropertyChanged(nameof(MenuRadius));
+            OnPropertyChanged(nameof(MenuSize));
         }
     }
+
+    /// <summary>One tile of the opened menu.</summary>
+    public double TileSize
+    {
+        get => _settings.TileSize;
+        set
+        {
+            double clamped = Math.Round(LauncherSettings.ClampTileSize(value));
+            if (Nearly(_settings.TileSize, clamped)) return;
+
+            _settings.TileSize = clamped;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(TileIconSize));
+            OnPropertyChanged(nameof(ItemWidth));
+            OnPropertyChanged(nameof(MenuRadius));
+            OnPropertyChanged(nameof(MenuSize));
+        }
+    }
+
+    /// <summary>The vector icon inside a tile.</summary>
+    public double TileIconSize => Math.Round(TileSize * 0.43);
+
+    /// <summary>A tile plus the room its label needs beside it.</summary>
+    public double ItemWidth => Math.Round(TileSize * 1.6);
+
+    /// <summary>
+    /// The ring the tiles sit on.
+    ///
+    /// It follows the tile size, so smaller tiles gather in closer to the icon instead of
+    /// floating out on a ring sized for tiles that are no longer there. The floor keeps them off
+    /// the icon itself: small tiles around a large icon would otherwise sit on top of it.
+    /// </summary>
+    public double MenuRadius
+        => Math.Round(Math.Max(TileSize * 2, IconSize / 2 + TileSize / 2 + 16));
+
+    /// <summary>
+    /// How big the launcher window grows to hold the open menu: the ring, plus half an item on
+    /// each side, plus room underneath for the labels.
+    /// </summary>
+    public double MenuSize => Math.Round((MenuRadius + ItemWidth / 2) * 2 + 48);
 
     /// <summary>The icon's fill. Frozen: it is rebuilt on every hue change and read from the
     /// render thread.</summary>
@@ -88,6 +132,10 @@ public sealed partial class LauncherAppearance : ObservableObject
     public double MinIconSize => LauncherSettings.MinIconSize;
 
     public double MaxIconSize => LauncherSettings.MaxIconSize;
+
+    public double MinTileSize => LauncherSettings.MinTileSize;
+
+    public double MaxTileSize => LauncherSettings.MaxTileSize;
 
     public void Save() => _settings.Save(LauncherSettings.DefaultPath);
 

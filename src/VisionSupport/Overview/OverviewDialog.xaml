@@ -2,7 +2,7 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:chrome="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
-        Title="전체보기" Width="420" Height="452"
+        Title="전체보기" Width="420" Height="484"
         Background="Transparent"
         WindowStyle="None" AllowsTransparency="True" Opacity="0.95"
         ResizeMode="NoResize" ShowInTaskbar="False"
@@ -100,11 +100,12 @@
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
 
                     <!-- A live sample of exactly what is on the desktop, so the sliders are not
                          being dragged blind against an icon that may be behind this dialog. -->
-                    <Grid Grid.Column="0" Grid.RowSpan="3" Width="52" Height="52"
+                    <Grid Grid.Column="0" Grid.RowSpan="4" Width="52" Height="52"
                           Margin="0,0,14,0" VerticalAlignment="Center">
                         <Ellipse Fill="{Binding IconBrush}" Stroke="{Binding IconEdgeBrush}"
                                  StrokeThickness="1" Opacity="{Binding IconOpacity}"/>
@@ -129,6 +130,12 @@
                                Margin="0,0,10,0" Foreground="{StaticResource FgDim}"/>
                     <Slider Grid.Row="2" Grid.Column="2" Value="{Binding IconSize, Mode=TwoWay}"
                             Minimum="{Binding MinIconSize}" Maximum="{Binding MaxIconSize}"
+                            SmallChange="1" LargeChange="8" VerticalAlignment="Center"/>
+
+                    <TextBlock Grid.Row="3" Grid.Column="1" Text="메뉴 타일 크기" FontSize="12"
+                               Margin="0,0,10,0" Foreground="{StaticResource FgDim}"/>
+                    <Slider Grid.Row="3" Grid.Column="2" Value="{Binding TileSize, Mode=TwoWay}"
+                            Minimum="{Binding MinTileSize}" Maximum="{Binding MaxTileSize}"
                             SmallChange="1" LargeChange="8" VerticalAlignment="Center"/>
                 </Grid>
             </Border>

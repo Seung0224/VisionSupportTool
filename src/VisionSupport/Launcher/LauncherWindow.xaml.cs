@@ -87,9 +87,6 @@ public partial class LauncherWindow : Window
 
         viewModel.CollapseNowRequested += (_, _) => Collapse(animate: false);
 
-        SourceInitialized += (_, _) => MatchCacheToScreen();
-        DpiChanged += (_, _) => MatchCacheToScreen();
-
         viewModel.PropertyChanged += (_, e) =>
         {
             if (e.PropertyName == nameof(LauncherViewModel.IsExpanded) && !viewModel.IsExpanded)
@@ -104,15 +101,25 @@ public partial class LauncherWindow : Window
     private double CollapsedSize => ViewModel.Appearance.IconSize + IconMargin * 2;
 
     /// <summary>
-    /// Bakes the menu's cached bitmap at the monitor's own pixel density.
+    /// Freezes the menu into a bitmap for the length of an animation.
     ///
-    /// The cache is what keeps the open/close animation smooth, but a cache rendered at 1.0 on a
-    /// 150% display is three pixels doing the work of four - it is stretched on the way to the
-    /// screen, and the tiles come out looking soft at the edges. Following the DPI keeps the
-    /// bitmap pixel-for-pixel with the display it is drawn on.
+    /// Scaling five tiles - each a rounded border with a drop shadow, a vector icon and a label -
+    /// re-rasterises all of it every frame on a transparent window, which renders in software.
+    /// Cached, the animation scales one ready-made bitmap.
+    ///
+    /// It comes off the moment the animation ends. A cache left on is a picture of the menu
+    /// rather than the menu, and it shows: soft edges on everything, permanently. Baked at the
+    /// monitor's own pixel density for the same reason - a bitmap rendered at 1.0 and displayed
+    /// on a 150% screen is stretched on its way there.
     /// </summary>
-    private void MatchCacheToScreen()
-        => MenuCache.RenderAtScale = VisualTreeHelper.GetDpi(this).DpiScaleX;
+    private void HoldMenuAsBitmap()
+        => Menu.CacheMode = new BitmapCache
+        {
+            RenderAtScale = VisualTreeHelper.GetDpi(this).DpiScaleX,
+            SnapsToDevicePixels = true,
+        };
+
+    private void ReleaseMenuBitmap() => Menu.CacheMode = null;
 
     private void OnFabPressed(object sender, MouseButtonEventArgs e)
     {
@@ -165,15 +172,17 @@ public partial class LauncherWindow : Window
         _animationToken++;
         ViewModel.IsExpanded = true;
 
-        Resize(LauncherViewModel.ExpandedSize);
+        Resize(ViewModel.Appearance.MenuSize);
         NudgeOntoScreen();
 
         Menu.Visibility = Visibility.Visible;
+        HoldMenuAsBitmap();
 
         // Decelerating, with no overshoot. A springy ease sends every tile past its resting place
         // and back, and because the places are arranged in a circle that reads as the whole menu
         // scattering outwards rather than as one thing springing open.
-        AnimateMenu(1.0, 1.0, new CubicEase { EasingMode = EasingMode.EaseOut }, 240, onDone: null);
+        AnimateMenu(1.0, 1.0, new CubicEase { EasingMode = EasingMode.EaseOut }, 240,
+                    onDone: ReleaseMenuBitmap);
         AnimateFabAngle(180);
     }
 
@@ -192,11 +201,18 @@ public partial class LauncherWindow : Window
 
         if (animate)
         {
+            HoldMenuAsBitmap();
             AnimateMenu(FoldedScale, 0.0, new CubicEase { EasingMode = EasingMode.EaseIn }, 170,
-                        () => FinishCollapse(token));
+                        () =>
+                        {
+                            ReleaseMenuBitmap();
+                            FinishCollapse(token);
+                        });
         }
         else
         {
+            ReleaseMenuBitmap();
+
             // Hand the properties back from the animations before setting them, or the animation
             // clock keeps its hold and the values are ignored.
             MenuScale.BeginAnimation(ScaleTransform.ScaleXProperty, null);
