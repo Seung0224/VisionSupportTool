@@ -5,7 +5,7 @@
         WindowStyle="None" AllowsTransparency="True" Background="{x:Null}"
         Topmost="True" ShowInTaskbar="False" ResizeMode="NoResize"
         Width="72" Height="72" UseLayoutRounding="True"
-        TextOptions.TextFormattingMode="Ideal">
+        TextOptions.TextFormattingMode="Display">
 
     <Window.Resources>
         <!-- One tile: a rounded square that grows a little under the pointer and dips when
@@ -23,27 +23,49 @@
                                 <ScaleTransform x:Name="Zoom" ScaleX="1" ScaleY="1"/>
                             </Grid.RenderTransform>
 
-                            <Border x:Name="Chrome" CornerRadius="{StaticResource RadiusTile}"
-                                    Background="{TemplateBinding Background}" BorderThickness="1"
-                                    BorderBrush="{TemplateBinding BorderBrush}">
-                                <Border.Effect>
-                                    <DropShadowEffect BlurRadius="14" ShadowDepth="3"
-                                                      Direction="270" Opacity="0.55" Color="Black"/>
-                                </Border.Effect>
-                            </Border>
+                            <!-- No drop shadow, deliberately.
+
+                                 An Effect makes WPF render its whole subtree into an intermediate
+                                 surface at less than screen resolution, so a shadow on the tile
+                                 softened the tile. Moving the shadow to a black rectangle behind
+                                 the tile fixed that and introduced a worse artefact: the tile's
+                                 antialiased edge is part-transparent, so the black underneath
+                                 showed through it as a hairline crack just inside the rim.
+
+                                 The 2px rim does the separating instead. It costs some depth and
+                                 buys an edge that is actually sharp.
+
+                                 A 2px rim rather than 1px: at one pixel the edge is a single
+                                 half-lit line against whatever wallpaper is behind it, which
+                                 reads as blur rather than as an edge.
+
+                                 Rectangle, not Border, and that is the whole point of this
+                                 element. A Border paints its background and its border as two
+                                 separate geometries, and on a rounded corner a sub-pixel gap
+                                 opens between them. On an opaque window nobody notices; on a
+                                 transparent one the desktop shows through that gap, which on a
+                                 dark desktop is a black hairline between the rim and the fill.
+                                 A Shape strokes and fills one geometry, so there is no seam to
+                                 show through.
+
+                                 The radius is 18 to match Theme/Dark.xaml's RadiusTile - a
+                                 CornerRadius resource cannot be bound to RadiusX/RadiusY. -->
+                            <Rectangle x:Name="Chrome" RadiusX="18" RadiusY="18"
+                                       Fill="{TemplateBinding Background}"
+                                       Stroke="{TemplateBinding BorderBrush}" StrokeThickness="2"/>
 
                             <!-- Hover brightens with a white wash rather than a second colour, so
                                  the highlight follows whatever hue the user picked instead of
                                  needing its own palette entry. -->
-                            <Border x:Name="Glow" CornerRadius="{StaticResource RadiusTile}"
-                                    Background="White" Opacity="0"/>
+                            <Rectangle x:Name="Glow" RadiusX="18" RadiusY="18"
+                                       Fill="White" Opacity="0"/>
 
                             <!-- The running ring. A feature can be up with no window open, and
                                  this is the only place that says so at a glance. -->
-                            <Border BorderBrush="{StaticResource StateRunning}" BorderThickness="2"
-                                    CornerRadius="{StaticResource RadiusTile}"
-                                    Visibility="{Binding IsRunning,
-                                                Converter={StaticResource BoolToVis}}"/>
+                            <Rectangle RadiusX="18" RadiusY="18"
+                                       Stroke="{StaticResource StateRunning}" StrokeThickness="2"
+                                       Visibility="{Binding IsRunning,
+                                                   Converter={StaticResource BoolToVis}}"/>
 
                             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Grid>
@@ -81,12 +103,21 @@
                                     </BeginStoryboard>
                                 </Trigger.ExitActions>
                             </Trigger>
-                            <!-- A press dip, and back to the hover size on release - the pointer
-                                 is by definition still over the tile at that point. Storyboards
-                                 rather than Setters because a Setter cannot target a transform. -->
+                            <!-- A press dip that is lifted rather than undone.
+
+                                 Releasing used to animate back to the hover size, on the
+                                 assumption that the pointer is still over the tile. Clicking a
+                                 tile shuts the menu, so it is not: the tile was left holding the
+                                 hover size, and the next time the menu opened that one icon was
+                                 12% bigger than its neighbours.
+
+                                 RemoveStoryboard takes the dip off and lets whatever the hover
+                                 trigger is holding show through - the hover size while the
+                                 pointer is there, the resting size once it has left. There is no
+                                 size written here for the two to disagree about. -->
                             <Trigger Property="IsPressed" Value="True">
                                 <Trigger.EnterActions>
-                                    <BeginStoryboard>
+                                    <BeginStoryboard x:Name="PressDip">
                                         <Storyboard>
                                             <DoubleAnimation Storyboard.TargetName="Zoom"
                                                              Storyboard.TargetProperty="ScaleX"
@@ -98,16 +129,7 @@
                                     </BeginStoryboard>
                                 </Trigger.EnterActions>
                                 <Trigger.ExitActions>
-                                    <BeginStoryboard>
-                                        <Storyboard>
-                                            <DoubleAnimation Storyboard.TargetName="Zoom"
-                                                             Storyboard.TargetProperty="ScaleX"
-                                                             To="1.12" Duration="0:0:0.10"/>
-                                            <DoubleAnimation Storyboard.TargetName="Zoom"
-                                                             Storyboard.TargetProperty="ScaleY"
-                                                             To="1.12" Duration="0:0:0.10"/>
-                                        </Storyboard>
-                                    </BeginStoryboard>
+                                    <RemoveStoryboard BeginStoryboardName="PressDip"/>
                                 </Trigger.ExitActions>
                             </Trigger>
                         </ControlTemplate.Triggers>
@@ -175,9 +197,11 @@
                         <Border Margin="0,7,0,0" HorizontalAlignment="Center"
                                 CornerRadius="{StaticResource RadiusPill}"
                                 Background="#E61A1A1A" Padding="9,3">
+                            <!-- One line, sized to the text. The slot around it (ItemWidth) is
+                                 wide enough for the longest label, so nothing has to wrap and
+                                 nothing runs off the window. -->
                             <TextBlock Text="{Binding Title}" FontSize="11"
-                                       Foreground="{StaticResource Fg}"
-                                       HorizontalAlignment="Center"/>
+                                       Foreground="{StaticResource Fg}"/>
                         </Border>
                     </StackPanel>
                 </DataTemplate>
@@ -193,13 +217,9 @@
                 <ScaleTransform x:Name="FabZoom" ScaleX="1" ScaleY="1"/>
             </Grid.RenderTransform>
 
+            <!-- No shadow here either; see the tile template for why. -->
             <Ellipse Fill="{Binding Appearance.IconBrush}"
-                     Stroke="{Binding Appearance.IconEdgeBrush}" StrokeThickness="1">
-                <Ellipse.Effect>
-                    <DropShadowEffect BlurRadius="18" ShadowDepth="4" Direction="270"
-                                      Opacity="0.6" Color="Black"/>
-                </Ellipse.Effect>
-            </Ellipse>
+                     Stroke="{Binding Appearance.IconEdgeBrush}" StrokeThickness="2"/>
 
             <Ellipse Stroke="{StaticResource StateRunning}" StrokeThickness="2.5" Margin="1"
                      Visibility="{Binding AnyRunning, Converter={StaticResource BoolToVis}}"/>
