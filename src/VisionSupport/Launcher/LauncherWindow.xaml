@@ -1,0 +1,83 @@
+<Window x:Class="VisionSupport.Launcher.LauncherWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        WindowStyle="None" AllowsTransparency="True" Background="{x:Null}"
+        Topmost="True" ShowInTaskbar="False" ResizeMode="NoResize"
+        Width="72" Height="72" UseLayoutRounding="True">
+
+    <!-- Background is {x:Null}, not Transparent: a null background is not hit-testable, so
+         clicks in the empty area around the icon reach whatever is behind the launcher. -->
+    <Grid Background="{x:Null}">
+
+        <ItemsControl x:Name="Menu" ItemsSource="{Binding Items}" Visibility="Collapsed"
+                      RenderTransformOrigin="0.5,0.5">
+            <ItemsControl.RenderTransform>
+                <ScaleTransform x:Name="MenuScale" ScaleX="0.6" ScaleY="0.6"/>
+            </ItemsControl.RenderTransform>
+            <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <Canvas/>
+                </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemContainerStyle>
+                <Style TargetType="ContentPresenter">
+                    <Setter Property="Canvas.Left" Value="{Binding X}"/>
+                    <Setter Property="Canvas.Top" Value="{Binding Y}"/>
+                </Style>
+            </ItemsControl.ItemContainerStyle>
+            <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                    <Button Command="{Binding ActivateCommand}" ToolTip="{Binding Title}"
+                            Width="56" Height="56" Margin="0" Padding="0"
+                            Background="{StaticResource PanelAlt}"
+                            BorderBrush="{StaticResource Border}">
+                        <Button.Template>
+                            <ControlTemplate TargetType="Button">
+                                <Grid>
+                                    <Border x:Name="Chrome" Background="{TemplateBinding Background}"
+                                            BorderBrush="{TemplateBinding BorderBrush}"
+                                            BorderThickness="1"
+                                            CornerRadius="{StaticResource RadiusTile}"/>
+                                    <!-- The running ring: a feature can be up with no window open,
+                                         and this is the only place that says so at a glance. -->
+                                    <Border BorderBrush="{StaticResource StateRunning}"
+                                            BorderThickness="2"
+                                            CornerRadius="{StaticResource RadiusTile}"
+                                            Visibility="{Binding IsRunning,
+                                                        Converter={StaticResource BoolToVis}}"/>
+                                    <TextBlock Text="{Binding Glyph}" FontFamily="Segoe MDL2 Assets"
+                                               FontSize="20" HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"
+                                               Foreground="{StaticResource Fg}"/>
+                                </Grid>
+                                <ControlTemplate.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter TargetName="Chrome" Property="Background"
+                                                Value="{StaticResource AccentHover}"/>
+                                    </Trigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </Button.Template>
+                    </Button>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+        <Grid x:Name="Fab" Width="56" Height="56" Background="{x:Null}"
+              HorizontalAlignment="Center" VerticalAlignment="Center" Cursor="SizeAll">
+            <Ellipse Fill="#FF141414" Stroke="{StaticResource Border}" StrokeThickness="1"/>
+            <Ellipse Stroke="{StaticResource StateRunning}" StrokeThickness="2"
+                     Visibility="{Binding AnyRunning, Converter={StaticResource BoolToVis}}"/>
+            <TextBlock Text="&#xE710;" FontFamily="Segoe MDL2 Assets" FontSize="20"
+                       HorizontalAlignment="Center" VerticalAlignment="Center"
+                       Foreground="{StaticResource Fg}"/>
+            <Grid.ContextMenu>
+                <ContextMenu Background="{StaticResource Panel}" Foreground="{StaticResource Fg}">
+                    <MenuItem x:Name="OverviewMenuItem" Header="전체보기"/>
+                    <Separator/>
+                    <MenuItem x:Name="ExitMenuItem" Header="종료"/>
+                </ContextMenu>
+            </Grid.ContextMenu>
+        </Grid>
+    </Grid>
+</Window>

@@ -4,13 +4,18 @@ using System.Security.Principal;
 using System.Windows;
 using System.Windows.Threading;
 using VisionSupport.Features;
+using VisionSupport.Launcher;
 using VisionSupport.Shell;
+using VisionSupport.Windows;
 
 namespace VisionSupport;
 
 public partial class App : Application
 {
-    private ShellViewModel? _shell;
+    private readonly ActivityLog _activity = new();
+    private readonly DateTime _startedAt = DateTime.Now;
+
+    private LauncherSettings _settings = new();
 
     protected override void OnStartup(StartupEventArgs e)
     {
@@ -18,14 +23,61 @@ public partial class App : Application
 
         if (!EnsureElevated()) return;
 
+        // Feature windows come and go; the launcher is the only thing that stays. Without this
+        // the process would exit the moment the last feature window closed.
+        ShutdownMode = ShutdownMode.OnExplicitShutdown;
+
         // This process is meant to stay up for days with features starting and stopping under
         // it. A feature that throws on a background task or in an event handler must not be
-        // able to take the shell with it, so those escape hatches are closed here.
+        // able to take the launcher with it, so those escape hatches are closed here.
         DispatcherUnhandledException += OnDispatcherUnhandledException;
         TaskScheduler.UnobservedTaskException += OnUnobservedTaskException;
 
-        _shell = new ShellViewModel(CreateModules());
-        new ShellWindow { DataContext = _shell }.Show();
+        _settings = LauncherSettings.Load(LauncherSettings.DefaultPath);
+        PlaceIcon();
+
+        // One registration covers every window in the process, including the dialogs the feature
+        // assemblies open. Those assemblies do not reference this one and are not being changed,
+        // so a class handler is the only seam that reaches them.
+        EventManager.RegisterClassHandler(typeof(Window), FrameworkElement.LoadedEvent,
+            new RoutedEventHandler(OnAnyWindowLoaded));
+
+        var launcher = new LauncherViewModel(CreateModules(), _activity, _settings, _startedAt);
+        new LauncherWindow(launcher, _settings).Show();
+    }
+
+    /// <summary>
+    /// Parks a first-run icon near the bottom-right, and rescues one left on a monitor that is no
+    /// longer attached - there would be no way back to it but deleting the settings file.
+    /// </summary>
+    private void PlaceIcon()
+    {
+        var iconSize = new Size(72, 72);
+        var fallback = new Point(
+            SystemParameters.WorkArea.Right - 110,
+            SystemParameters.WorkArea.Bottom - 130);
+
+        var virtualScreen = new Rect(
+            SystemParameters.VirtualScreenLeft, SystemParameters.VirtualScreenTop,
+            SystemParameters.VirtualScreenWidth, SystemParameters.VirtualScreenHeight);
+
+        Point placed = _settings is { IconLeft: 0, IconTop: 0 }
+            ? fallback
+            : LauncherSettings.ConstrainToScreen(
+                new Point(_settings.IconLeft, _settings.IconTop), iconSize, virtualScreen, fallback);
+
+        _settings.IconLeft = placed.X;
+        _settings.IconTop = placed.Y;
+    }
+
+    private void OnAnyWindowLoaded(object sender, RoutedEventArgs e)
+    {
+        // The launcher paints its own shape through AllowsTransparency and must not have a
+        // constant alpha layered on top of that.
+        if (sender is Window { AllowsTransparency: false } window)
+        {
+            WindowEffects.ApplyAlpha(window, _settings.Opacity);
+        }
     }
 
     /// <summary>
@@ -85,13 +137,13 @@ public partial class App : Application
 
     private void OnDispatcherUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)
     {
-        _shell?.Activity.Add("지원툴", "처리되지 않은 오류: " + e.Exception.Message);
+        _activity.Add("지원툴", "처리되지 않은 오류: " + e.Exception.Message);
         e.Handled = true;
     }
 
     private void OnUnobservedTaskException(object? sender, UnobservedTaskExceptionEventArgs e)
     {
-        _shell?.Activity.Add("지원툴", "백그라운드 작업 오류: " + e.Exception.GetBaseException().Message);
+        _activity.Add("지원툴", "백그라운드 작업 오류: " + e.Exception.GetBaseException().Message);
         e.SetObserved();
     }
 }

@@ -28,6 +28,14 @@
     <SolidColorBrush x:Key="StatePaused" Color="#FFDCDCAA"/>
     <SolidColorBrush x:Key="StateFaulted" Color="#FFF48771"/>
 
+    <!-- One UI-flavoured corner radii. Every rounded surface reads one of these rather than
+         inventing its own number, so the whole app rounds by the same amount at the same scale. -->
+    <CornerRadius x:Key="RadiusWindow">16</CornerRadius>
+    <CornerRadius x:Key="RadiusCard">14</CornerRadius>
+    <CornerRadius x:Key="RadiusTile">18</CornerRadius>
+    <CornerRadius x:Key="RadiusControl">10</CornerRadius>
+    <CornerRadius x:Key="RadiusPill">999</CornerRadius>
+
     <Style TargetType="TextBlock">
         <Setter Property="Foreground" Value="{StaticResource Fg}"/>
         <Setter Property="VerticalAlignment" Value="Center"/>
@@ -46,7 +54,7 @@
                     <Border x:Name="Chrome" Background="{TemplateBinding Background}"
                             BorderBrush="{TemplateBinding BorderBrush}"
                             BorderThickness="{TemplateBinding BorderThickness}"
-                            CornerRadius="3" SnapsToDevicePixels="True">
+                            CornerRadius="{StaticResource RadiusControl}" SnapsToDevicePixels="True">
                         <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"
                                           Margin="{TemplateBinding Padding}"/>
                     </Border>
@@ -78,7 +86,7 @@
             <Setter.Value>
                 <ControlTemplate TargetType="ToggleButton">
                     <Border x:Name="Chrome" Background="{StaticResource PanelAlt}"
-                            BorderBrush="{StaticResource Border}" BorderThickness="1" CornerRadius="3">
+                            BorderBrush="{StaticResource Border}" BorderThickness="1" CornerRadius="{StaticResource RadiusControl}">
                         <Path HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,9,0"
                               Data="M0,0 L8,0 L4,5 Z" Fill="{StaticResource FgDim}"/>
                     </Border>
@@ -281,7 +289,8 @@
             <Setter.Value>
                 <ControlTemplate TargetType="ToolTip">
                     <Border Background="{StaticResource PanelAlt}" BorderBrush="{StaticResource Border}"
-                            BorderThickness="1" CornerRadius="4" Padding="11,9" MaxWidth="420">
+                            BorderThickness="1" CornerRadius="{StaticResource RadiusControl}"
+                            Padding="11,9" MaxWidth="420">
                         <TextBlock Text="{TemplateBinding Content}" TextWrapping="Wrap"
                                    LineHeight="19" Foreground="{StaticResource Fg}"/>
                     </Border>
@@ -321,6 +330,48 @@
                         </Trigger>
                         <Trigger Property="IsSelected" Value="True">
                             <Setter TargetName="Chrome" Property="BorderBrush" Value="{StaticResource AccentBright}"/>
+                            <Setter Property="Foreground" Value="{StaticResource Fg}"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- A rounded surface one step lighter than the page behind it. Sections are separated by
+         tone rather than by lines, which is what makes the One UI look read as soft. -->
+    <Style x:Key="Card" TargetType="Border">
+        <Setter Property="Background" Value="{StaticResource Panel}"/>
+        <Setter Property="CornerRadius" Value="{StaticResource RadiusCard}"/>
+        <Setter Property="Padding" Value="14,12"/>
+    </Style>
+
+    <Style x:Key="AccentButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+        <Setter Property="Background" Value="{StaticResource Accent}"/>
+        <Setter Property="BorderBrush" Value="{StaticResource Accent}"/>
+        <Setter Property="Foreground" Value="White"/>
+    </Style>
+
+    <!-- Caption buttons for the custom title bar. Borderless and flush in the corner the way
+         Windows' own are, so the rounded window edge stays the only shape up there. -->
+    <Style x:Key="TitleBarButton" TargetType="Button">
+        <Setter Property="Width" Value="46"/>
+        <Setter Property="Height" Value="32"/>
+        <Setter Property="Margin" Value="0"/>
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="Foreground" Value="{StaticResource FgDim}"/>
+        <Setter Property="FontFamily" Value="Segoe MDL2 Assets"/>
+        <Setter Property="FontSize" Value="10"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="Chrome" Background="Transparent"
+                            CornerRadius="{StaticResource RadiusControl}">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Chrome" Property="Background" Value="{StaticResource PanelAlt}"/>
                             <Setter Property="Foreground" Value="{StaticResource Fg}"/>
                         </Trigger>
                     </ControlTemplate.Triggers>
