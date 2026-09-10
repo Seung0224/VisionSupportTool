@@ -2,20 +2,27 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:chrome="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
-        Background="{StaticResource Bg}"
+        Background="Transparent"
+        WindowStyle="None" AllowsTransparency="True"
+        Opacity="0.5"
         WindowStartupLocation="CenterScreen"
         MinWidth="720" MinHeight="480"
         UseLayoutRounding="True">
 
-    <!-- WindowChrome rather than AllowsTransparency: a custom dark caption without dropping the
-         window onto WPF's software rendering path. The outer corners are rounded by
-         WindowEffects, which clips the HWND itself. -->
+    <!-- AllowsTransparency is not a style choice here, it is the only way WPF will make a window
+         see-through at all: the Win32 layered-window route is refused on WPF's DWM-composited
+         windows. It has to be declared before the window is shown, which is why it lives in the
+         markup rather than being applied later like the opacity value itself.
+
+         WindowChrome stays for the caption and resize borders, which a WindowStyle=None window
+         would otherwise have none of. The rounded corners are now just the border below. -->
     <chrome:WindowChrome.WindowChrome>
         <chrome:WindowChrome CaptionHeight="40" GlassFrameThickness="0" CornerRadius="0"
                              ResizeBorderThickness="6" UseAeroCaptionButtons="False"/>
     </chrome:WindowChrome.WindowChrome>
 
-    <Border Background="{StaticResource Bg}" CornerRadius="{StaticResource RadiusWindow}">
+    <Border x:Name="RootBorder" Background="{StaticResource Bg}"
+            CornerRadius="{StaticResource RadiusWindow}">
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="40"/>

@@ -6,7 +6,6 @@ using System.Windows.Threading;
 using VisionSupport.Features;
 using VisionSupport.Launcher;
 using VisionSupport.Shell;
-using VisionSupport.Windows;
 
 namespace VisionSupport;
 
@@ -36,13 +35,8 @@ public partial class App : Application
         _settings = LauncherSettings.Load(LauncherSettings.DefaultPath);
         PlaceIcon();
 
-        // One registration covers every window in the process, including the dialogs the feature
-        // assemblies open. Those assemblies do not reference this one and are not being changed,
-        // so a class handler is the only seam that reaches them.
-        EventManager.RegisterClassHandler(typeof(Window), FrameworkElement.LoadedEvent,
-            new RoutedEventHandler(OnAnyWindowLoaded));
-
-        var launcher = new LauncherViewModel(CreateModules(), _activity, _settings, _startedAt);
+        var appearance = new LauncherAppearance(_settings);
+        var launcher = new LauncherViewModel(CreateModules(), _activity, _settings, appearance, _startedAt);
         new LauncherWindow(launcher, _settings).Show();
     }
 
@@ -68,16 +62,6 @@ public partial class App : Application
 
         _settings.IconLeft = placed.X;
         _settings.IconTop = placed.Y;
-    }
-
-    private void OnAnyWindowLoaded(object sender, RoutedEventArgs e)
-    {
-        // The launcher paints its own shape through AllowsTransparency and must not have a
-        // constant alpha layered on top of that.
-        if (sender is Window { AllowsTransparency: false } window)
-        {
-            WindowEffects.ApplyAlpha(window, _settings.Opacity);
-        }
     }
 
     /// <summary>

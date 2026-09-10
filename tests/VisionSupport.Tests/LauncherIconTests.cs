@@ -16,6 +16,7 @@ public class LauncherIconTests
     [Fact]
     public void Every_launcher_tile_names_an_icon_that_exists()
     {
+        var settings = new LauncherSettings();
         var launcher = new LauncherViewModel(
             new IFeatureModule[]
             {
@@ -23,7 +24,7 @@ public class LauncherIconTests
                 new PlcServerFeature(),
                 new ImageConverterFeature(),
             },
-            new ActivityLog(), new LauncherSettings(), DateTime.Now);
+            new ActivityLog(), settings, new LauncherAppearance(settings), DateTime.Now);
 
         Assert.NotEmpty(launcher.Items);
 

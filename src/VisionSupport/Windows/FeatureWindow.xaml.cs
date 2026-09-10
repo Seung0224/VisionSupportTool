@@ -16,9 +16,6 @@ namespace VisionSupport.Windows;
 /// </summary>
 public partial class FeatureWindow : Window
 {
-    /// <summary>Matches Theme/Dark.xaml's RadiusWindow. Kept in step by hand; it is one number.</summary>
-    private const double WindowCornerRadius = 16;
-
     private const double CaptionHeight = 40;
 
     private bool _readyToClose;
@@ -43,8 +40,13 @@ public partial class FeatureWindow : Window
 
         module.Changed += OnModuleChanged;
 
-        SourceInitialized += (_, _) => WindowEffects.AttachRoundedCorners(this, WindowCornerRadius);
         SizeChanged += (_, e) => CaptionClip.Rect = new Rect(0, 0, e.NewSize.Width, CaptionHeight);
+
+        // A maximised window has no corners to round - leaving the radius on cuts four notches
+        // of desktop out of the screen corners.
+        StateChanged += (_, _) => RootBorder.CornerRadius = WindowState == WindowState.Maximized
+            ? new CornerRadius(0)
+            : (CornerRadius)FindResource("RadiusWindow");
         Closing += OnClosing;
         Closed += (_, _) => module.Changed -= OnModuleChanged;
 

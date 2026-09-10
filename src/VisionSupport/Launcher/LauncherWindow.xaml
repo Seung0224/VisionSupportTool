@@ -153,14 +153,17 @@
             </ItemsControl.ItemTemplate>
         </ItemsControl>
 
-        <Grid x:Name="Fab" Width="60" Height="60" Background="{x:Null}"
+        <Grid x:Name="Fab" Background="{x:Null}"
+              Width="{Binding Appearance.IconSize}" Height="{Binding Appearance.IconSize}"
+              Opacity="{Binding Appearance.IconOpacity}"
               HorizontalAlignment="Center" VerticalAlignment="Center"
               RenderTransformOrigin="0.5,0.5">
             <Grid.RenderTransform>
                 <ScaleTransform x:Name="FabZoom" ScaleX="1" ScaleY="1"/>
             </Grid.RenderTransform>
 
-            <Ellipse Fill="#FF17181C" Stroke="#FF3A3D44" StrokeThickness="1">
+            <Ellipse Fill="{Binding Appearance.IconBrush}"
+                     Stroke="{Binding Appearance.IconEdgeBrush}" StrokeThickness="1">
                 <Ellipse.Effect>
                     <DropShadowEffect BlurRadius="18" ShadowDepth="4" Direction="270"
                                       Opacity="0.6" Color="Black"/>
@@ -173,7 +176,7 @@
             <!-- VISION's V. Rotating it to a caret on expand is the open/close affordance; it is
                  also the only moving part that tells you the menu heard the click. -->
             <TextBlock x:Name="FabMark" Text="V" FontFamily="Segoe UI" FontWeight="Black"
-                       FontSize="26" Foreground="White"
+                       FontSize="{Binding Appearance.IconMarkSize}" Foreground="White"
                        HorizontalAlignment="Center" VerticalAlignment="Center"
                        RenderTransformOrigin="0.5,0.5">
                 <TextBlock.RenderTransform>

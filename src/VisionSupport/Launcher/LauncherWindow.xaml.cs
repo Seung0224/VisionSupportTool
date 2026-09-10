@@ -20,7 +20,8 @@ namespace VisionSupport.Launcher;
 /// </summary>
 public partial class LauncherWindow : Window
 {
-    private const double CollapsedSize = 72;
+    /// <summary>Breathing room around the icon, so the drop shadow is not clipped by the window.</summary>
+    private const double IconMargin = 12;
 
     /// <summary>How far the pointer has to move before a press counts as a drag, not a click.</summary>
     private const double DragThreshold = 4;
@@ -49,8 +50,20 @@ public partial class LauncherWindow : Window
         DataContext = viewModel;
         _settings = settings;
 
+        Width = CollapsedSize;
+        Height = CollapsedSize;
         Left = settings.IconLeft;
         Top = settings.IconTop;
+
+        // Resizing the icon resizes the window it lives in - the collapsed window is only ever
+        // as big as the icon plus its shadow.
+        viewModel.Appearance.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(LauncherAppearance.IconSize) && !_menuOpen)
+            {
+                Resize(CollapsedSize);
+            }
+        };
 
         Fab.MouseLeftButtonDown += OnFabPressed;
         Fab.MouseMove += OnFabMoved;
@@ -80,6 +93,8 @@ public partial class LauncherWindow : Window
     }
 
     private LauncherViewModel ViewModel => (LauncherViewModel)DataContext;
+
+    private double CollapsedSize => ViewModel.Appearance.IconSize + IconMargin * 2;
 
     private void OnFabPressed(object sender, MouseButtonEventArgs e)
     {

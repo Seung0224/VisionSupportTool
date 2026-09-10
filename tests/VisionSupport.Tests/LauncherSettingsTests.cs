@@ -18,12 +18,12 @@ public class LauncherSettingsTests
         using var dir = new TempDir();
         string path = Path.Combine(dir.Path, "launcher.json");
 
-        new LauncherSettings { IconLeft = 640, IconTop = 480, Opacity = 0.75 }.Save(path);
+        new LauncherSettings { IconLeft = 640, IconTop = 480, IconOpacity = 0.75 }.Save(path);
         LauncherSettings loaded = LauncherSettings.Load(path);
 
         Assert.Equal(640, loaded.IconLeft);
         Assert.Equal(480, loaded.IconTop);
-        Assert.Equal(0.75, loaded.Opacity);
+        Assert.Equal(0.75, loaded.IconOpacity);
     }
 
     [Fact]
@@ -33,7 +33,7 @@ public class LauncherSettingsTests
 
         LauncherSettings loaded = LauncherSettings.Load(Path.Combine(dir.Path, "nothing.json"));
 
-        Assert.Equal(LauncherSettings.DefaultOpacity, loaded.Opacity);
+        Assert.Equal(LauncherSettings.DefaultIconOpacity, loaded.IconOpacity);
     }
 
     [Fact]
@@ -43,7 +43,7 @@ public class LauncherSettingsTests
         string path = Path.Combine(dir.Path, "launcher.json");
         File.WriteAllText(path, "{ this is not json");
 
-        Assert.Equal(LauncherSettings.DefaultOpacity, LauncherSettings.Load(path).Opacity);
+        Assert.Equal(LauncherSettings.DefaultIconOpacity, LauncherSettings.Load(path).IconOpacity);
     }
 
     [Theory]
@@ -53,9 +53,9 @@ public class LauncherSettingsTests
     {
         using var dir = new TempDir();
         string path = Path.Combine(dir.Path, "launcher.json");
-        File.WriteAllText(path, "{\"IconLeft\":0,\"IconTop\":0,\"Opacity\":" + stored + "}");
+        File.WriteAllText(path, "{\"IconLeft\":0,\"IconTop\":0,\"IconOpacity\":" + stored + "}");
 
-        Assert.Equal(expected, LauncherSettings.Load(path).Opacity);
+        Assert.Equal(expected, LauncherSettings.Load(path).IconOpacity);
     }
 
     [Fact]

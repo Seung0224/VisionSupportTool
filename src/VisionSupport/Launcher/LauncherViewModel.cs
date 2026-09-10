@@ -41,12 +41,14 @@ public sealed partial class LauncherViewModel : ObservableObject
     private bool _isExpanded;
 
     public LauncherViewModel(IReadOnlyList<IFeatureModule> modules, ActivityLog activity,
-                             LauncherSettings settings, DateTime startedAt)
+                             LauncherSettings settings, LauncherAppearance appearance,
+                             DateTime startedAt)
     {
         _modules = modules;
         _activity = activity;
         _settings = settings;
         _startedAt = startedAt;
+        Appearance = appearance;
 
         Point[] offsets = RadialLayout.Offsets(modules.Count + 1, MenuRadius);
 
@@ -73,6 +75,10 @@ public sealed partial class LauncherViewModel : ObservableObject
 
     public ObservableCollection<LauncherItem> Items { get; } = new();
 
+    /// <summary>The icon's colour, opacity and size. Shared with the overview dialog, which is
+    /// where they are changed.</summary>
+    public LauncherAppearance Appearance { get; }
+
     /// <summary>Drives the ring around the icon: something is up even with every window closed.</summary>
     public bool AnyRunning => _modules.Any(m => m.State is FeatureState.Running
                                                        or FeatureState.Starting
@@ -89,7 +95,7 @@ public sealed partial class LauncherViewModel : ObservableObject
             return;
         }
 
-        var viewModel = new OverviewViewModel(_modules, _activity, _settings, _startedAt, Open);
+        var viewModel = new OverviewViewModel(_modules, _activity, Appearance, _startedAt, Open);
         _overview = new OverviewDialog(viewModel);
         _overview.Closed += (_, _) => _overview = null;
         _overview.Show();

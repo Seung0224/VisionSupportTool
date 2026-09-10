@@ -6,7 +6,6 @@ using CommunityToolkit.Mvvm.Input;
 using VisionSupport.Features;
 using VisionSupport.Launcher;
 using VisionSupport.Shell;
-using VisionSupport.Windows;
 
 namespace VisionSupport.Overview;
 
@@ -23,7 +22,6 @@ public sealed partial class OverviewViewModel : ObservableObject
     private readonly Process _self = Process.GetCurrentProcess();
     private readonly DateTime _startedAt;
     private readonly DispatcherTimer _timer;
-    private readonly LauncherSettings _settings;
 
     private TimeSpan _lastCpuTotal;
     private DateTime _lastCpuAt;
@@ -41,12 +39,12 @@ public sealed partial class OverviewViewModel : ObservableObject
     private int _threadCount;
 
     public OverviewViewModel(IReadOnlyList<IFeatureModule> modules, ActivityLog activity,
-                             LauncherSettings settings, DateTime startedAt,
+                             LauncherAppearance appearance, DateTime startedAt,
                              Action<IFeatureModule> open)
     {
-        _settings = settings;
         _startedAt = startedAt;
         Activity = activity;
+        Appearance = appearance;
 
         foreach (IFeatureModule module in modules) Rows.Add(new FeatureRow(module, open));
 
@@ -62,31 +60,19 @@ public sealed partial class OverviewViewModel : ObservableObject
 
     public ActivityLog Activity { get; }
 
-    /// <summary>Bound to the slider. Setting it repaints every open window immediately.</summary>
-    public double Opacity
-    {
-        get => _settings.Opacity;
-        set
-        {
-            double clamped = LauncherSettings.ClampOpacity(value);
-            if (Math.Abs(_settings.Opacity - clamped) < 0.001) return;
-
-            _settings.Opacity = clamped;
-            WindowEffects.ApplyAlphaToAll(clamped);
-            OnPropertyChanged();
-        }
-    }
-
-    public double MinOpacity => LauncherSettings.MinOpacity;
-
-    public double MaxOpacity => LauncherSettings.MaxOpacity;
+    /// <summary>The launcher icon's colour, opacity and size. Changing one repaints the icon
+    /// straight away; this dialog is the only place they can be reached.</summary>
+    public LauncherAppearance Appearance { get; }
 
     public void Activate() => _timer.Start();
 
     public void Deactivate()
     {
         _timer.Stop();
-        _settings.Save(LauncherSettings.DefaultPath);
+
+        // Written once on the way out rather than on every slider tick, which would be a file
+        // write per frame of a drag.
+        Appearance.Save();
     }
 
     private void Refresh()
