@@ -62,6 +62,17 @@ public sealed class LauncherSettings
 
     public double TileSize { get; set; } = DefaultTileSize;
 
+    /// <summary>Ask for a password when packing. The password itself is never stored.</summary>
+    public bool UsePassword { get; set; }
+
+    /// <summary>Speed over size. The default, because the usual job is "send this to someone".</summary>
+    public bool FastCompress { get; set; } = true;
+
+    /// <summary>File everything dropped into one folder instead of packing it.</summary>
+    public bool CopyMode { get; set; }
+
+    public string CopyTargetFolder { get; set; } = string.Empty;
+
     /// <summary>
     /// The user's own web tiles. Null means "this file has never had them" and gets the shipped
     /// default; an empty list means the user removed them all and is left alone.

@@ -1,8 +1,13 @@
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.IO;
+using System.Runtime.InteropServices;
+using System.Text;
+using System.Windows.Interop;
 using System.Windows.Media.Animation;
 using System.Windows.Threading;
+using VisionSupport.Archive;
 
 namespace VisionSupport.Launcher;
 
@@ -48,6 +53,9 @@ public partial class LauncherWindow : Window
     /// as a press asking for it back.</summary>
     private DateTime _folderListClosedAt;
 
+    private ArchiveSettingsDialog? _archiveSettings;
+
+
     public LauncherWindow(LauncherViewModel viewModel, LauncherSettings settings)
     {
         InitializeComponent();
@@ -78,6 +86,7 @@ public partial class LauncherWindow : Window
 
         OverviewMenuItem.Click += (_, _) => viewModel.ShowOverview();
         LinksMenuItem.Click += (_, _) => viewModel.ShowLinks();
+        ArchiveMenuItem.Click += (_, _) => ShowArchiveSettings();
         ExitMenuItem.Click += async (_, _) => await viewModel.ExitAsync();
 
         KeyDown += (_, e) =>
@@ -90,6 +99,17 @@ public partial class LauncherWindow : Window
         Deactivated += (_, _) => Collapse();
 
         FolderList.Closed += (_, _) => _folderListClosedAt = DateTime.UtcNow;
+
+        SourceInitialized += (_, _) => AcceptFileDrops();
+        StartHoverWatch();
+
+        viewModel.Drops.PropertyChanged += (_, _) => ShowProgress();
+        viewModel.Appearance.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(LauncherAppearance.IconMarkSize)) ShowProgress();
+        };
+
+        Loaded += (_, _) => ShowProgress();
 
         viewModel.CollapseNowRequested += (_, _) =>
         {
@@ -165,6 +185,232 @@ public partial class LauncherWindow : Window
             -(look.MenuRadius + look.TileSize / 2 - look.IconSize / 2 + 20);
 
         FolderList.IsOpen = true;
+    }
+
+    // ---- Drag and drop -----------------------------------------------------------------------
+
+    private const int WM_DROPFILES = 0x0233;
+
+    private const int VK_LBUTTON = 0x01;
+
+    /// <summary>Fast enough to feel immediate, slow enough to be free.</summary>
+    private static readonly TimeSpan HoverPoll = TimeSpan.FromMilliseconds(80);
+
+    private DispatcherTimer? _hoverWatch;
+    private bool _hovering;
+
+    [DllImport("user32.dll")]
+    private static extern short GetAsyncKeyState(int key);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GetCursorPos(out NativePoint point);
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct NativePoint
+    {
+        public int X;
+        public int Y;
+    }
+
+    [DllImport("shell32.dll")]
+    private static extern void DragAcceptFiles(IntPtr hwnd, [MarshalAs(UnmanagedType.Bool)] bool accept);
+
+    [DllImport("shell32.dll", CharSet = CharSet.Unicode)]
+    private static extern uint DragQueryFileW(IntPtr drop, uint index, StringBuilder? file, uint length);
+
+    [DllImport("shell32.dll")]
+    private static extern void DragFinish(IntPtr drop);
+
+    [DllImport("ole32.dll")]
+    private static extern int RevokeDragDrop(IntPtr hwnd);
+
+    /// <summary>
+    /// Makes the icon a drop target the old way, which is the only way that works here.
+    ///
+    /// WPF's AllowDrop registers an OLE IDropTarget. This process is elevated and Explorer is not,
+    /// so Explorer cannot reach that interface - and while it is registered, Explorer will not
+    /// fall back to the legacy WM_DROPFILES route either. The result is a refusal cursor and no
+    /// events at all, which looks exactly like a feature nobody implemented.
+    ///
+    /// So the OLE target is revoked, the window asks for dropped files directly, and the messages
+    /// that carry them are let back through the integrity filter. The image converter arrived at
+    /// the same three lines for the same reason.
+    ///
+    /// What this costs is drag-over feedback: WM_DROPFILES arrives on the drop and never before
+    /// it, so the icon cannot swell while a file is held over it. The progress ring covers the
+    /// part the user actually needs to see.
+    /// </summary>
+    /// <summary>
+    /// Lights the icon up while something is dragged over it.
+    ///
+    /// This has to be inferred rather than received. Drag-over is part of the OLE protocol, and
+    /// that protocol is what UIPI blocks for an elevated window - during a drag from Explorer this
+    /// window is sent nothing at all, not even a mouse move, because the drag source holds the
+    /// mouse capture. The legacy route that does work only speaks on the drop itself.
+    ///
+    /// So: the left button is held and the pointer is over the icon. That is also true while the
+    /// user drags the icon itself, which is excluded, and while they drag anything else across it,
+    /// which is not - and a brief highlight in that case is a target saying "here", not a lie.
+    ///
+    /// The cost is one GetAsyncKeyState per tick, and the position is only asked for when the
+    /// button is actually down.
+    /// </summary>
+    private void StartHoverWatch()
+    {
+        _hoverWatch = new DispatcherTimer(HoverPoll, DispatcherPriority.Background,
+                                          (_, _) => CheckHover(), Dispatcher);
+        _hoverWatch.Start();
+        Closed += (_, _) => _hoverWatch.Stop();
+    }
+
+    private void CheckHover()
+    {
+        bool held = (GetAsyncKeyState(VK_LBUTTON) & 0x8000) != 0;
+        bool over = held && !_pressed && !ViewModel.Drops.IsBusy && PointerIsOverIcon();
+
+        if (over == _hovering) return;
+
+        _hovering = over;
+        AnimateFabZoom(over ? 1.18 : 1.0);
+        Animate(DropGlow, UIElement.OpacityProperty, over ? 0.28 : 0.0, 120);
+    }
+
+    private bool PointerIsOverIcon()
+    {
+        if (!GetCursorPos(out NativePoint cursor)) return false;
+
+        // Screen pixels on both sides: PointToScreen already returns device coordinates, so the
+        // monitor's scaling never enters into it.
+        Point topLeft = Fab.PointToScreen(new Point(0, 0));
+        Point bottomRight = Fab.PointToScreen(new Point(Fab.ActualWidth, Fab.ActualHeight));
+
+        return cursor.X >= topLeft.X && cursor.X <= bottomRight.X
+            && cursor.Y >= topLeft.Y && cursor.Y <= bottomRight.Y;
+    }
+
+    private static void Animate(UIElement target, DependencyProperty property, double to, int milliseconds)
+        => target.BeginAnimation(property,
+            new DoubleAnimation(to, new Duration(TimeSpan.FromMilliseconds(milliseconds)))
+            {
+                EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut },
+            });
+
+    private void AcceptFileDrops()
+    {
+        if (PresentationSource.FromVisual(this) is not HwndSource source) return;
+
+        DropElevation.AllowDropMessages();
+
+        string? refused = DropElevation.AllowDropMessagesFor(source.Handle);
+        if (refused is not null) ViewModel.NoteDropFilter(refused);
+
+        RevokeDragDrop(source.Handle);
+        DragAcceptFiles(source.Handle, true);
+        source.AddHook(OnWindowMessage);
+    }
+
+    private IntPtr OnWindowMessage(IntPtr hwnd, int message, IntPtr wParam, IntPtr lParam, ref bool handled)
+    {
+        if (message != WM_DROPFILES) return IntPtr.Zero;
+
+        string[] paths = ReadDroppedFiles(wParam);
+        handled = true;
+
+        if (paths.Length > 0) _ = HandleDrop(paths);
+        return IntPtr.Zero;
+    }
+
+    private static string[] ReadDroppedFiles(IntPtr drop)
+    {
+        try
+        {
+            // 0xFFFFFFFF asks for the count rather than a name.
+            uint count = DragQueryFileW(drop, 0xFFFFFFFF, null, 0);
+            var paths = new List<string>((int)count);
+
+            for (uint i = 0; i < count; i++)
+            {
+                uint length = DragQueryFileW(drop, i, null, 0);
+                var buffer = new StringBuilder((int)length + 1);
+                DragQueryFileW(drop, i, buffer, (uint)buffer.Capacity);
+                paths.Add(buffer.ToString());
+            }
+
+            return paths.ToArray();
+        }
+        finally
+        {
+            DragFinish(drop);
+        }
+    }
+
+    private async Task HandleDrop(string[] paths)
+    {
+        _hovering = false;
+        AnimateFabZoom(1.0);
+        Animate(DropGlow, UIElement.OpacityProperty, 0.0, 120);
+
+        ViewModel.NoteDrag(paths.Length, ViewModel.Drops.CanAccept);
+
+        Collapse(animate: false);
+        await ViewModel.Drops.HandleAsync(paths);
+    }
+
+    /// <summary>
+    /// Draws whatever the drop is doing onto the icon.
+    ///
+    /// Two readouts, because they answer different questions. The ring says how far along at a
+    /// glance - it is one ellipse whose dash pattern is sized to its own circumference, so the
+    /// dash is the finished part and growing it draws the arc. The mark carries the number, and
+    /// then the tick or the bang, which is what the original showed and what says whether it
+    /// worked.
+    ///
+    /// The percentage is set smaller than the V: "100%" is four characters where the V is one.
+    /// </summary>
+    private void ShowProgress()
+    {
+        DropCoordinator drops = ViewModel.Drops;
+        bool working = drops.State == DropState.Working;
+
+        FabMark.Text = drops.Mark;
+        FabMark.FontSize = Math.Max(8, ViewModel.Appearance.IconMarkSize * drops.MarkScale);
+        FabMark.Foreground = drops.State switch
+        {
+            DropState.Done => (Brush)FindResource("StateRunning"),
+            DropState.Failed => (Brush)FindResource("StateFaulted"),
+            _ => Brushes.White,
+        };
+
+        Fab.ToolTip = drops.Status;
+
+        Progress.Visibility = working ? Visibility.Visible : Visibility.Collapsed;
+        if (!working) return;
+
+        double radius = (ViewModel.Appearance.IconSize - 8) / 2;
+        double circumference = 2 * Math.PI * radius / Progress.StrokeThickness;
+        double filled = circumference * drops.Percent / 100.0;
+
+        Progress.StrokeDashArray = new DoubleCollection { filled, Math.Max(0.01, circumference - filled) };
+    }
+
+    /// <summary>
+    /// Opens the drop options, and keeps only one of them open. Same shape as the overview and
+    /// the links editor, because it is the same kind of thing.
+    /// </summary>
+    private void ShowArchiveSettings()
+    {
+        Collapse(animate: false);
+
+        if (_archiveSettings is not null)
+        {
+            _archiveSettings.Activate();
+            return;
+        }
+
+        _archiveSettings = new ArchiveSettingsDialog(_settings);
+        _archiveSettings.Closed += (_, _) => _archiveSettings = null;
+        _archiveSettings.Show();
     }
 
     private void OnFabPressed(object sender, MouseButtonEventArgs e)

@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using VisionSupport.Archive;
 using VisionSupport.Features;
 using VisionSupport.Overview;
 using VisionSupport.Shell;
@@ -39,6 +40,7 @@ public sealed partial class LauncherViewModel : ObservableObject
         _settings = settings;
         _startedAt = startedAt;
         Appearance = appearance;
+        Drops = new DropCoordinator(settings, activity);
 
         foreach (IFeatureModule module in modules)
         {
@@ -138,6 +140,9 @@ public sealed partial class LauncherViewModel : ObservableObject
     /// <summary>The icon's colour, opacity and size. Shared with the overview dialog, which is
     /// where they are changed.</summary>
     public LauncherAppearance Appearance { get; }
+
+    /// <summary>Packing, unpacking and filing whatever is dropped on the icon.</summary>
+    public DropCoordinator Drops { get; }
 
     /// <summary>
     /// Asks the menu to shut instantly rather than animate out. Raised just before something
@@ -279,6 +284,15 @@ public sealed partial class LauncherViewModel : ObservableObject
         _open[module] = window;
         window.Show();
     }
+
+    /// <summary>Records that Windows refused to open this window to drags from Explorer.</summary>
+    public void NoteDropFilter(string detail) => _activity.Add("드롭", "메시지 " + detail);
+
+    /// <summary>Records that a drag actually reached the launcher, and what it carried.</summary>
+    public void NoteDrag(int fileCount, bool accepted)
+        => _activity.Add("드롭", accepted
+            ? $"항목 {fileCount}개 감지"
+            : fileCount == 0 ? "파일이 아닌 내용" : "작업 중이라 거부");
 
     private void OnModuleChanged(object? sender, EventArgs e)
     {

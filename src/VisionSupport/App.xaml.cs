@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Security.Principal;
 using System.Windows;
 using System.Windows.Threading;
+using VisionSupport.Archive;
 using VisionSupport.Features;
 using VisionSupport.Launcher;
 using VisionSupport.Shell;
@@ -34,6 +35,10 @@ public partial class App : Application
 
         _settings = LauncherSettings.Load(LauncherSettings.DefaultPath);
         PlaceIcon();
+
+        // Before any window exists: an elevated process is not a drop target until the messages
+        // Explorer sends are let back through.
+        DropElevation.AllowDropMessages();
 
         var appearance = new LauncherAppearance(_settings);
         var launcher = new LauncherViewModel(CreateModules(), _activity, _settings, appearance, _startedAt);

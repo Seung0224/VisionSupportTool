@@ -272,11 +272,27 @@
             <Ellipse Fill="{Binding Appearance.IconBrush}"
                      Stroke="{Binding Appearance.IconEdgeBrush}" StrokeThickness="2"/>
 
+            <!-- Lights up while something is held over the icon. A white wash rather than a
+                 second colour, so it follows whatever hue the user picked. -->
+            <Ellipse x:Name="DropGlow" Fill="White" Opacity="0"/>
+
             <Ellipse Stroke="{StaticResource StateRunning}" StrokeThickness="2.5" Margin="1"
                      Visibility="{Binding AnyRunning, Converter={StaticResource BoolToVis}}"/>
 
             <!-- VISION's V. Rotating it to a caret on expand is the open/close affordance; it is
                  also the only moving part that tells you the menu heard the click. -->
+            <!-- A ring that fills as a job runs, drawn as an arc's worth of stroke. Reading a
+                 percentage off a small circle is hard; watching one close is not. -->
+            <Ellipse x:Name="Progress" Stroke="White" StrokeThickness="3" Margin="4"
+                     Opacity="0.9" Visibility="Collapsed"
+                     StrokeDashCap="Round" RenderTransformOrigin="0.5,0.5">
+                <Ellipse.RenderTransform>
+                    <RotateTransform Angle="-90"/>
+                </Ellipse.RenderTransform>
+            </Ellipse>
+
+            <!-- Text, size and colour are all set from code: they follow the drop's state, not
+                 just the icon's size, and one binding cannot express both. -->
             <TextBlock x:Name="FabMark" Text="V" FontFamily="Segoe UI" FontWeight="Black"
                        FontSize="{Binding Appearance.IconMarkSize}" Foreground="White"
                        HorizontalAlignment="Center" VerticalAlignment="Center"
@@ -290,6 +306,8 @@
                 <ContextMenu Background="{StaticResource Panel}" Foreground="{StaticResource Fg}">
                     <MenuItem x:Name="OverviewMenuItem" Header="전체보기"/>
                     <MenuItem x:Name="LinksMenuItem" Header="링크 편집"/>
+                    <Separator/>
+                    <MenuItem x:Name="ArchiveMenuItem" Header="압축 설정"/>
                     <Separator/>
                     <MenuItem x:Name="ExitMenuItem" Header="종료"/>
                 </ContextMenu>
