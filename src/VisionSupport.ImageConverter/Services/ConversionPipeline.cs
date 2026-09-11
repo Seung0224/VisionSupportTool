@@ -5,20 +5,15 @@ using System.Windows.Media.Imaging;
 namespace VisionSupport.ImageConverter.Services;
 
 /// <summary>
-/// One file in, one file out: decode -> resize -> grayscale -> bit depth -> encode. The .idb
-/// codec, when present, handles its own extension on either end; everything else goes through the
-/// WPF codec.
+/// One file in, one file out: decode -> resize -> grayscale -> bit depth -> encode. Everything
+/// goes through the WPF codec, which reads whatever the OS has a decoder for.
 /// </summary>
 public static class ConversionPipeline
 {
     public static void Convert(string sourcePath, string outputPath, ImageFormat target,
-        ConversionOptions options, IImageCodec wpfCodec, IImageDbCodec? idbCodec)
+        ConversionOptions options, IImageCodec wpfCodec)
     {
-        string sourceExtension = Path.GetExtension(sourcePath);
-
-        BitmapSource image = idbCodec is not null && idbCodec.CanDecode(sourceExtension)
-            ? idbCodec.Decode(sourcePath)
-            : wpfCodec.Decode(sourcePath);
+        BitmapSource image = wpfCodec.Decode(sourcePath);
 
         image = Resize(image, options);
         if (options.Grayscale) image = new FormatConvertedBitmap(image, PixelFormats.Gray8, null, 0);
@@ -26,15 +21,7 @@ public static class ConversionPipeline
 
         if (image.CanFreeze && !image.IsFrozen) image.Freeze();
 
-        if (target == ImageFormat.Idb)
-        {
-            if (idbCodec is null) throw new NotSupportedException("The Cognex .idb codec is not loaded.");
-            idbCodec.Encode(image, outputPath);
-        }
-        else
-        {
-            wpfCodec.Encode(image, outputPath, target, options);
-        }
+        wpfCodec.Encode(image, outputPath, target, options);
     }
 
     private static BitmapSource Resize(BitmapSource image, ConversionOptions options)

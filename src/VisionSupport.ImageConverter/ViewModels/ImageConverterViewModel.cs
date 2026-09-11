@@ -31,21 +31,18 @@ public sealed partial class ImageConverterViewModel : ObservableObject, IDisposa
     [ObservableProperty]
     private BitmapSource? _previewImage;
 
-    public ImageConverterViewModel(IConversionRunner runner, ImageConverterSettings settings, bool idbAvailable)
+    public ImageConverterViewModel(IConversionRunner runner, ImageConverterSettings settings)
     {
         _runner = runner;
         Options = settings.Options;
         _recurseFolders = settings.RecurseFolders;
-        IdbAvailable = idbAvailable;
-        OutputFormats = FormatCatalog.OutputFormats(idbAvailable);
+        OutputFormats = FormatCatalog.OutputFormats();
         Queue.CollectionChanged += (_, _) => OnPropertyChanged(nameof(Summary));
     }
 
     public ObservableCollection<ConversionItem> Queue { get; } = new();
 
     public ConversionOptions Options { get; }
-
-    public bool IdbAvailable { get; }
 
     public IReadOnlyList<ImageFormat> OutputFormats { get; }
 
@@ -125,11 +122,10 @@ public sealed partial class ImageConverterViewModel : ObservableObject, IDisposa
     [RelayCommand]
     private void AddFiles()
     {
-        string idb = IdbAvailable ? ";*.idb" : "";
         var dialog = new OpenFileDialog
         {
             Multiselect = true,
-            Filter = $"이미지 파일|*.bmp;*.png;*.jpg;*.jpeg;*.gif;*.tif;*.tiff;*.jxr;*.wdp;*.ico{idb}|모든 파일|*.*",
+            Filter = "이미지 파일|*.bmp;*.png;*.jpg;*.jpeg;*.gif;*.tif;*.tiff;*.jxr;*.wdp;*.ico|모든 파일|*.*",
         };
         if (dialog.ShowDialog() == true) AddPaths(dialog.FileNames);
     }
@@ -247,7 +243,6 @@ public sealed partial class ImageConverterViewModel : ObservableObject, IDisposa
         if (value is null) return;
 
         string extension = Path.GetExtension(value.SourcePath);
-        if (extension.Equals(".idb", StringComparison.OrdinalIgnoreCase)) return; // needs the plugin to render
 
         try
         {
@@ -268,7 +263,7 @@ public sealed partial class ImageConverterViewModel : ObservableObject, IDisposa
 
     private void TryAdd(string file)
     {
-        if (!FormatCatalog.IsSupportedInput(Path.GetExtension(file), IdbAvailable)) return;
+        if (!FormatCatalog.IsSupportedInput(Path.GetExtension(file))) return;
         if (Queue.Any(i => string.Equals(i.SourcePath, file, StringComparison.OrdinalIgnoreCase))) return;
         Queue.Add(new ConversionItem(file));
     }

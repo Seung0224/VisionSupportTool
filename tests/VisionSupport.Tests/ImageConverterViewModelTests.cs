@@ -159,7 +159,7 @@ public class ImageConverterViewModelTests
     private static ImageConverterViewModel NewViewModel(out FakeRunner runner)
     {
         runner = new FakeRunner();
-        return new ImageConverterViewModel(runner, new ImageConverterSettings(), idbAvailable: false);
+        return new ImageConverterViewModel(runner, new ImageConverterSettings());
     }
 
     private sealed class FakeRunner : IConversionRunner

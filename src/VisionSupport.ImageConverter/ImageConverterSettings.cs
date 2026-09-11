@@ -10,6 +10,4 @@ public sealed class ImageConverterSettings
 
     public bool RecurseFolders { get; set; } = true;
 
-    /// <summary>VisionPro's <c>bin</c> folder for the .idb plugin. Blank = standard install path.</summary>
-    public string CognexBinPath { get; set; } = "";
 }

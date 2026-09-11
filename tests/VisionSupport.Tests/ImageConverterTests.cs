@@ -27,22 +27,12 @@ public class FormatCatalogTests
     }
 
     [Fact]
-    public void Idb_is_absent_from_input_and_output_until_the_codec_loads()
-    {
-        Assert.False(FormatCatalog.IsSupportedInput(".idb", idbAvailable: false));
-        Assert.DoesNotContain(ImageFormat.Idb, FormatCatalog.OutputFormats(idbAvailable: false));
-
-        Assert.True(FormatCatalog.IsSupportedInput(".idb", idbAvailable: true));
-        Assert.Contains(ImageFormat.Idb, FormatCatalog.OutputFormats(idbAvailable: true));
-    }
-
-    [Fact]
     public void Input_extension_matching_ignores_case_and_rejects_non_images()
     {
-        Assert.True(FormatCatalog.IsSupportedInput(".png", idbAvailable: false));
-        Assert.True(FormatCatalog.IsSupportedInput(".PNG", idbAvailable: false));
-        Assert.True(FormatCatalog.IsSupportedInput(".jpeg", idbAvailable: false));
-        Assert.False(FormatCatalog.IsSupportedInput(".txt", idbAvailable: false));
+        Assert.True(FormatCatalog.IsSupportedInput(".png"));
+        Assert.True(FormatCatalog.IsSupportedInput(".PNG"));
+        Assert.True(FormatCatalog.IsSupportedInput(".jpeg"));
+        Assert.False(FormatCatalog.IsSupportedInput(".txt"));
     }
 
     [Fact]
@@ -51,7 +41,6 @@ public class FormatCatalogTests
         Assert.Equal(".jpg", FormatCatalog.ExtensionOf(ImageFormat.Jpeg));
         Assert.Equal(".png", FormatCatalog.ExtensionOf(ImageFormat.Png));
         Assert.Equal(".tif", FormatCatalog.ExtensionOf(ImageFormat.Tiff));
-        Assert.Equal(".idb", FormatCatalog.ExtensionOf(ImageFormat.Idb));
     }
 }
 
@@ -122,7 +111,7 @@ public class ConversionPipelineTests
         string dst = Path.Combine(dir.Path, "out.png");
         SaveBmp(src, width: 6, height: 3);
 
-        ConversionPipeline.Convert(src, dst, ImageFormat.Png, new ConversionOptions(), new WpfImageCodec(), null);
+        ConversionPipeline.Convert(src, dst, ImageFormat.Png, new ConversionOptions(), new WpfImageCodec());
 
         BitmapFrame decoded = Decode(dst);
         Assert.Equal(6, decoded.PixelWidth);
@@ -138,7 +127,7 @@ public class ConversionPipelineTests
         SaveBmp(src, width: 8, height: 4);
 
         var options = new ConversionOptions { ResizeKind = ResizeKind.Percent, ResizePercent = 50 };
-        ConversionPipeline.Convert(src, dst, ImageFormat.Png, options, new WpfImageCodec(), null);
+        ConversionPipeline.Convert(src, dst, ImageFormat.Png, options, new WpfImageCodec());
 
         BitmapFrame decoded = Decode(dst);
         Assert.Equal(4, decoded.PixelWidth);
@@ -160,7 +149,7 @@ public class ConversionPipelineTests
             ResizeHeight = 4,
             KeepAspect = true,
         };
-        ConversionPipeline.Convert(src, dst, ImageFormat.Png, options, new WpfImageCodec(), null);
+        ConversionPipeline.Convert(src, dst, ImageFormat.Png, options, new WpfImageCodec());
 
         BitmapFrame decoded = Decode(dst);
         Assert.Equal(4, decoded.PixelWidth);
@@ -182,7 +171,7 @@ public class ConversionPipelineTests
             ResizeHeight = 6,
             KeepAspect = false,
         };
-        ConversionPipeline.Convert(src, dst, ImageFormat.Png, options, new WpfImageCodec(), null);
+        ConversionPipeline.Convert(src, dst, ImageFormat.Png, options, new WpfImageCodec());
 
         BitmapFrame decoded = Decode(dst);
         Assert.Equal(6, decoded.PixelWidth);
@@ -198,7 +187,7 @@ public class ConversionPipelineTests
         SaveBmp(src, width: 4, height: 4);
 
         ConversionPipeline.Convert(src, dst, ImageFormat.Png, new ConversionOptions { Grayscale = true },
-            new WpfImageCodec(), null);
+            new WpfImageCodec());
 
         Assert.Equal(PixelFormats.Gray8, Decode(dst).Format);
     }
@@ -233,7 +222,7 @@ public class ConversionRunnerTests
         string src = Path.Combine(dir.Path, "shot.bmp");
         WriteBmp(src, 5, 5);
         string outFolder = Path.Combine(dir.Path, "converted");
-        var runner = new ConversionRunner(new WpfImageCodec(), null);
+        var runner = new ConversionRunner(new WpfImageCodec());
 
         string result = runner.Convert(src, outFolder, new ConversionOptions { TargetFormat = ImageFormat.Jpeg });
 
@@ -250,17 +239,6 @@ public class ConversionRunnerTests
         encoder.Frames.Add(BitmapFrame.Create(source));
         using var stream = File.Create(path);
         encoder.Save(stream);
-    }
-}
-
-public class CognexCodecLoaderTests
-{
-    [Fact]
-    public void Load_returns_null_without_throwing_when_the_plugin_is_absent()
-    {
-        IImageDbCodec? codec = CognexCodecLoader.Load(@"C:\definitely\not\here\VisionPro\bin");
-
-        Assert.Null(codec);
     }
 }
 

@@ -26,21 +26,16 @@ public static class FormatCatalog
         ".bmp", ".png", ".jpg", ".jpeg", ".gif", ".tif", ".tiff", ".jxr", ".wdp", ".ico",
     };
 
-    public static bool IsSupportedInput(string extension, bool idbAvailable)
-    {
-        if (idbAvailable && extension.Equals(".idb", StringComparison.OrdinalIgnoreCase)) return true;
-        return InputExtensions.Contains(extension);
-    }
+    public static bool IsSupportedInput(string extension) => InputExtensions.Contains(extension);
 
     /// <summary>Output formats offered in the target dropdown, in menu order.</summary>
-    public static IReadOnlyList<ImageFormat> OutputFormats(bool idbAvailable)
+    public static IReadOnlyList<ImageFormat> OutputFormats()
     {
         var formats = new List<ImageFormat>
         {
             ImageFormat.Png, ImageFormat.Jpeg, ImageFormat.Bmp,
             ImageFormat.Tiff, ImageFormat.Gif, ImageFormat.JpegXr,
         };
-        if (idbAvailable) formats.Add(ImageFormat.Idb);
         return formats;
     }
 
@@ -60,7 +55,6 @@ public static class FormatCatalog
         ImageFormat.Gif => ".gif",
         ImageFormat.Tiff => ".tif",
         ImageFormat.JpegXr => ".jxr",
-        ImageFormat.Idb => ".idb",
         _ => throw new ArgumentOutOfRangeException(nameof(format), format, null),
     };
 }

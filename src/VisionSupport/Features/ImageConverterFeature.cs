@@ -46,10 +46,9 @@ public sealed class ImageConverterFeature : FeatureModule
             if (_viewModel is not null) return _viewModel;
 
             _settings = _store.Load();
-            IImageDbCodec? idbCodec = CognexCodecLoader.Load(_settings.CognexBinPath);
-            var runner = new ConversionRunner(new WpfImageCodec(), idbCodec);
+            var runner = new ConversionRunner(new WpfImageCodec());
 
-            _viewModel = new ImageConverterViewModel(runner, _settings, idbCodec is not null);
+            _viewModel = new ImageConverterViewModel(runner, _settings);
             _viewModel.PropertyChanged += OnViewModelPropertyChanged;
             return _viewModel;
         }

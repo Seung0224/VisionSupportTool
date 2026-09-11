@@ -9,8 +9,7 @@ VisionSupport.sln
    ├─ VisionSupport                       셸 (WinExe · net9.0-windows · x64 · 관리자 권한)
    ├─ VisionSupport.MemoryMonitor         구 모니터링/MemMon   (클래스 라이브러리)
    ├─ VisionSupport.PlcServer             구 Server/VirtualPlcServer (클래스 라이브러리)
-   ├─ VisionSupport.ImageConverter        이미지 변환기 (클래스 라이브러리)
-   └─ VisionSupport.ImageConverter.Cognex 코그넥스 .idb 코덱 (선택 플러그인, 런타임 로딩)
+   └─ VisionSupport.ImageConverter        이미지 변환기 (클래스 라이브러리)
 ```
 
 ## 원본 프로젝트에 대해

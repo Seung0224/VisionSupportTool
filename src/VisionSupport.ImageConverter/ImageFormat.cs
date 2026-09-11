@@ -13,5 +13,4 @@ public enum ImageFormat
     Gif,
     Tiff,
     JpegXr,
-    Idb,
 }
