@@ -382,7 +382,6 @@ public partial class LauncherWindow : Window
             _ => Brushes.White,
         };
 
-        Fab.ToolTip = drops.Status;
 
         Progress.Visibility = working ? Visibility.Visible : Visibility.Collapsed;
         if (!working) return;

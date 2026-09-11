@@ -82,6 +82,61 @@ public class LinksViewModelTests
         Assert.Empty(editor.FolderLinks);
     }
 
+    /// <summary>
+    /// Order is the order of the tiles round the ring, so it has to be changeable - and the row
+    /// has to stay selected, or reordering would be two clicks per step.
+    /// </summary>
+    [Fact]
+    public void A_folder_can_be_moved_up_and_stays_selected()
+    {
+        LinksViewModel editor = Empty();
+        editor.AddFolderCommand.Execute(null);
+        editor.AddFolderCommand.Execute(null);
+        editor.FolderLinks[0].Title = "첫째";
+        editor.FolderLinks[1].Title = "둘째";
+
+        editor.SelectedFolder = editor.FolderLinks[1];
+        editor.MoveUpCommand.Execute(null);
+
+        Assert.Equal("둘째", editor.FolderLinks[0].Title);
+        Assert.Equal("첫째", editor.FolderLinks[1].Title);
+        Assert.Same(editor.FolderLinks[0], editor.SelectedFolder);
+    }
+
+    [Fact]
+    public void Moving_past_either_end_does_nothing()
+    {
+        LinksViewModel editor = Empty();
+        editor.AddFolderCommand.Execute(null);
+        editor.AddFolderCommand.Execute(null);
+        editor.FolderLinks[0].Title = "첫째";
+
+        editor.SelectedFolder = editor.FolderLinks[0];
+        editor.MoveUpCommand.Execute(null);
+
+        Assert.Equal("첫째", editor.FolderLinks[0].Title);
+
+        editor.SelectedFolder = editor.FolderLinks[1];
+        editor.MoveDownCommand.Execute(null);
+
+        Assert.Equal("첫째", editor.FolderLinks[0].Title);
+    }
+
+    /// <summary>A row only moves within its own list; the two never trade places.</summary>
+    [Fact]
+    public void Moving_never_crosses_between_the_lists()
+    {
+        LinksViewModel editor = Empty();
+        editor.AddWebCommand.Execute(null);
+        editor.AddFolderCommand.Execute(null);
+
+        editor.SelectedFolder = editor.FolderLinks[0];
+        editor.MoveUpCommand.Execute(null);
+
+        Assert.Single(editor.WebLinks);
+        Assert.Single(editor.FolderLinks);
+    }
+
     private static LinksViewModel Empty()
         => new(new ObservableCollection<LauncherLink>(), new ObservableCollection<LauncherLink>());
 }

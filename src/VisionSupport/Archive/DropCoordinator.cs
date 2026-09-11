@@ -65,17 +65,6 @@ public sealed partial class DropCoordinator : ObservableObject
     /// </summary>
     public double MarkScale => State == DropState.Working ? 0.52 : 1.0;
 
-    /// <summary>One line for the icon's tooltip, so hovering says what it is doing.</summary>
-    public string Status => State switch
-    {
-        DropState.Working => $"{_label} 중… {Percent}%",
-        DropState.Done => $"{_label} 완료",
-        DropState.Failed => $"{_label} 실패",
-        _ => _settings.CopyMode
-            ? "파일을 놓으면 지정한 폴더로 복사합니다"
-            : "파일을 놓으면 압축하고, 압축 파일을 놓으면 풉니다",
-    };
-
     /// <summary>
     /// Runs the drop. Returns when the job is finished, having reported the outcome to the
     /// activity log rather than to a message box - the launcher has nowhere to show one that
@@ -210,13 +199,11 @@ public sealed partial class DropCoordinator : ObservableObject
     {
         OnPropertyChanged(nameof(Mark));
         OnPropertyChanged(nameof(MarkScale));
-        OnPropertyChanged(nameof(Status));
     }
 
     partial void OnPercentChanged(int value)
     {
         OnPropertyChanged(nameof(Mark));
-        OnPropertyChanged(nameof(Status));
     }
 
     /// <summary>Pulls the file list out of a drop, or null when it carries no files.</summary>

@@ -95,6 +95,37 @@ public sealed partial class LinksViewModel : ObservableObject
         if (next is null) Selected = null;
     }
 
+    [RelayCommand]
+    private void MoveUp() => Move(-1);
+
+    [RelayCommand]
+    private void MoveDown() => Move(1);
+
+    /// <summary>
+    /// Shuffles the selected row within its own list.
+    ///
+    /// Order is not decoration here: it is the order of the tiles round the ring and of the names
+    /// in the folder list, and the thing you reach for most should not be wherever you happened
+    /// to add it. Moving raises a collection change, so the ring follows at once.
+    /// </summary>
+    private void Move(int delta)
+    {
+        if (Selected is not { } link) return;
+
+        ObservableCollection<LauncherLink> list = link.Kind == LinkKind.Web ? WebLinks : FolderLinks;
+        int from = list.IndexOf(link);
+        int to = from + delta;
+
+        if (from < 0 || to < 0 || to >= list.Count) return;
+
+        list.Move(from, to);
+
+        // The move can clear the list box's selection, and losing it after every nudge would make
+        // reordering a two-click-per-step affair.
+        if (link.Kind == LinkKind.Web) SelectedWeb = link;
+        else SelectedFolder = link;
+    }
+
     /// <summary>
     /// Picks the folder rather than making the user type a path. Network paths and deep project
     /// folders are exactly where a typo is easy and the failure is silent.
