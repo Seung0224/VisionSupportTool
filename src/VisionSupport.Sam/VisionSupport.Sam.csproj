@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <PlatformTarget>x64</PlatformTarget>
+    <AssemblyName>VisionSupport.Sam</AssemblyName>
+    <RootNamespace>VisionSupport.Sam</RootNamespace>
+    <!-- DXGI adapter enumeration calls COM vtables through function pointers. -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <!-- The native helpers (GPU adapter pick, DLL search) are tested without a public surface. -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="VisionSupport.Tests" />
+  </ItemGroup>
+
+  <!-- 1.23.0 carries DirectML 1.15.4. The spike found the older inbox DirectML 1.0 in System32
+       cannot serve it, which is why DirectMlLoader preloads this package's copy. -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.ML.OnnxRuntime.DirectML" Version="1.23.0" />
+  </ItemGroup>
+
+</Project>
