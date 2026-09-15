@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.Diagnostics;
+using System.Windows.Media;
 using System.Windows.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -69,6 +70,7 @@ public sealed partial class OverviewViewModel : ObservableObject
     public void Deactivate()
     {
         _timer.Stop();
+        foreach (FeatureRow row in Rows) row.Detach();
 
         // Written once on the way out rather than on every slider tick, which would be a file
         // write per frame of a drag.
@@ -118,8 +120,8 @@ public sealed partial class OverviewViewModel : ObservableObject
 }
 
 /// <summary>
-/// One feature's row. Carries the stop button, which is the only way to bring down a feature that
-/// is running with its window closed.
+/// One feature's row: whether its tool is doing anything, and a way to open it. Starting and
+/// stopping belong to each tool's own window.
 /// </summary>
 public sealed partial class FeatureRow : ObservableObject
 {
@@ -129,35 +131,29 @@ public sealed partial class FeatureRow : ObservableObject
     {
         Module = module;
         _open = open;
-        module.Changed += (_, _) => Refresh();
+        module.Changed += OnModuleChanged;
     }
 
     public IFeatureModule Module { get; }
 
     public string Title => Module.Title;
 
-    public FeatureState State => Module.State;
+    public Brush StateBrush => FeatureBrushes.For(Module);
 
     public string StatusLine => Module.StatusLine;
-
-    public string ToggleLabel => Module.State is FeatureState.Running or FeatureState.Paused
-        ? "정지"
-        : "실행";
 
     [RelayCommand]
     private void Open() => _open(Module);
 
-    [RelayCommand]
-    private async Task Toggle()
-    {
-        if (Module.State is FeatureState.Running or FeatureState.Paused) await Module.StopAsync();
-        else await Module.StartAsync();
-    }
-
     public void Refresh()
     {
-        OnPropertyChanged(nameof(State));
+        OnPropertyChanged(nameof(StateBrush));
         OnPropertyChanged(nameof(StatusLine));
-        OnPropertyChanged(nameof(ToggleLabel));
     }
+
+    /// <summary>Drops the subscription to Module.Changed. Module outlives every dialog open, so
+    /// without this each reopen would leave one more row permanently rooted behind it.</summary>
+    public void Detach() => Module.Changed -= OnModuleChanged;
+
+    private void OnModuleChanged(object? sender, EventArgs e) => Refresh();
 }

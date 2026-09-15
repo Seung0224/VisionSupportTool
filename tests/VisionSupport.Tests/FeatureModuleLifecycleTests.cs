@@ -28,24 +28,26 @@ public class FeatureModuleLifecycleTests
     });
 
     [Fact]
-    public void Releasing_the_view_does_not_touch_the_run_state() => RunSta(() =>
+    public void Releasing_the_view_does_not_stop_the_feature() => RunSta(() =>
     {
         var module = new FakeFeature();
         module.GetOrCreateView();
-        module.StartAsync().GetAwaiter().GetResult();
 
         module.ReleaseView();
 
-        Assert.Equal(FeatureState.Running, module.State);
         Assert.False(module.WasStopped);
     });
 
+    /// <summary>
+    /// Opening a window builds the feature's view and ViewModel, and nothing about that moves the
+    /// state off Stopped - the tools are run from their own buttons. A Stopped feature can still be
+    /// holding everything its view showed, and stopping it must let go of that.
+    /// </summary>
     [Fact]
-    public void Stopping_releases_the_view_as_well() => RunSta(() =>
+    public void Stopping_releases_everything_the_view_built() => RunSta(() =>
     {
         var module = new FakeFeature();
         UserControl first = module.GetOrCreateView();
-        module.StartAsync().GetAwaiter().GetResult();
 
         module.StopAsync().GetAwaiter().GetResult();
 
@@ -91,17 +93,13 @@ public class FeatureModuleLifecycleTests
 
         public override string Description => "수명주기 검증용";
 
+        public override bool IsWorking => false;
+
         protected override UserControl CreateView()
         {
             ViewsCreated++;
             return new UserControl();
         }
-
-        protected override Task OnStartAsync(CancellationToken ct) => Task.CompletedTask;
-
-        protected override Task OnPauseAsync() => Task.CompletedTask;
-
-        protected override Task OnResumeAsync() => Task.CompletedTask;
 
         protected override Task OnStopAsync()
         {

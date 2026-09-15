@@ -259,6 +259,38 @@
             </Border>
         </Popup>
 
+        <!-- The tools box: the memory monitor and the PLC server, which used to have tiles of their
+             own. Same place and same manners as the folder list. Three by three whatever is in it,
+             so it reads as a box with room left in it rather than as a short list. -->
+        <Popup x:Name="ToolBox" PlacementTarget="{Binding ElementName=Fab}" Placement="Left"
+               AllowsTransparency="True" StaysOpen="False" PopupAnimation="Fade">
+            <Border Background="{StaticResource Panel}" BorderThickness="2"
+                    BorderBrush="{Binding DataContext.Appearance.IconEdgeBrush,
+                                 ElementName=LauncherRoot}"
+                    CornerRadius="{StaticResource RadiusCard}" Padding="6">
+                <ItemsControl ItemsSource="{Binding Tools}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <UniformGrid Rows="3" Columns="3"/>
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Button Style="{StaticResource MenuTile}" Margin="4" Width="46" Height="46"
+                                    Command="{Binding ActivateCommand}" ToolTip="{Binding Title}"
+                                    Background="{Binding DataContext.Appearance.IconBrush,
+                                                ElementName=LauncherRoot}"
+                                    BorderBrush="{Binding DataContext.Appearance.IconEdgeBrush,
+                                                 ElementName=LauncherRoot}">
+                                <icons:PackIconMaterial Kind="{Binding Glyph}" Foreground="White"
+                                                        Width="22" Height="22"/>
+                            </Button>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </Border>
+        </Popup>
+
         <Grid x:Name="Fab" Background="{x:Null}"
               Width="{Binding Appearance.IconSize}" Height="{Binding Appearance.IconSize}"
               Opacity="{Binding Appearance.IconOpacity}"

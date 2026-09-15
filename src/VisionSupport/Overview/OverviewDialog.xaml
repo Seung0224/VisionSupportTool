@@ -64,7 +64,7 @@
                                 </Grid.ColumnDefinitions>
 
                                 <Ellipse Grid.Column="0" Width="9" Height="9" Margin="0,0,10,0"
-                                         Fill="{Binding State, Converter={StaticResource StateBrush}}"/>
+                                         Fill="{Binding StateBrush}"/>
 
                                 <StackPanel Grid.Column="1">
                                     <TextBlock Text="{Binding Title}" FontSize="13"/>
@@ -76,8 +76,6 @@
                                 </StackPanel>
 
                                 <StackPanel Grid.Column="2" Orientation="Horizontal">
-                                    <Button Content="{Binding ToggleLabel}"
-                                            Command="{Binding ToggleCommand}" MinWidth="52"/>
                                     <Button Content="열기" Command="{Binding OpenCommand}"
                                             Style="{StaticResource AccentButton}"
                                             MinWidth="52" Margin="0"/>

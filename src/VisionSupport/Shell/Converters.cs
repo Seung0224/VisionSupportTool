@@ -6,26 +6,24 @@ using VisionSupport.Features;
 
 namespace VisionSupport.Shell;
 
-/// <summary>Paints the state dot and the command bar badge. One place, so every surface agrees.</summary>
-public sealed class StateBrushConverter : IValueConverter
+/// <summary>
+/// Paints a feature's state dot - the feature window's caption and the overview rows share it, so
+/// every surface agrees. Faulted and mid-release come from the shell; whether it is running comes
+/// from the tool itself.
+/// </summary>
+public static class FeatureBrushes
 {
-    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+    public static Brush For(IFeatureModule module)
     {
-        string key = value switch
+        string key = module.State switch
         {
-            FeatureState.Running => "StateRunning",
-            FeatureState.Starting => "StateRunning",
-            FeatureState.Paused => "StatePaused",
-            FeatureState.Stopping => "StatePaused",
             FeatureState.Faulted => "StateFaulted",
-            _ => "StateStopped",
+            FeatureState.Stopping => "StatePaused",
+            _ => module.IsWorking ? "StateRunning" : "StateStopped",
         };
 
         return Application.Current?.TryFindResource(key) as Brush ?? Brushes.Gray;
     }
-
-    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
-        => throw new NotSupportedException();
 }
 
 /// <summary>State to the Korean label shown in the command bar badge.</summary>
@@ -34,9 +32,6 @@ public sealed class StateTextConverter : IValueConverter
     public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
         => value switch
         {
-            FeatureState.Running => "실행 중",
-            FeatureState.Starting => "시작하는 중",
-            FeatureState.Paused => "정지됨",
             FeatureState.Stopping => "종료하는 중",
             FeatureState.Faulted => "오류",
             _ => "대기",

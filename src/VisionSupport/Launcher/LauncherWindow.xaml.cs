@@ -1,4 +1,5 @@
 using System.Windows;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.IO;
@@ -53,6 +54,8 @@ public partial class LauncherWindow : Window
     /// as a press asking for it back.</summary>
     private DateTime _folderListClosedAt;
 
+    private DateTime _toolBoxClosedAt;
+
     private ArchiveSettingsDialog? _archiveSettings;
 
 
@@ -99,6 +102,7 @@ public partial class LauncherWindow : Window
         Deactivated += (_, _) => Collapse();
 
         FolderList.Closed += (_, _) => _folderListClosedAt = DateTime.UtcNow;
+        ToolBox.Closed += (_, _) => _toolBoxClosedAt = DateTime.UtcNow;
 
         SourceInitialized += (_, _) => AcceptFileDrops();
         StartHoverWatch();
@@ -114,13 +118,15 @@ public partial class LauncherWindow : Window
         viewModel.CollapseNowRequested += (_, _) =>
         {
             FolderList.IsOpen = false;
+            ToolBox.IsOpen = false;
             Collapse(animate: false);
         };
 
-        // The folder tile opens its list beside the menu and leaves the menu up: picking a
-        // folder is a second step, and closing the ring underneath would make it look like the
+        // The folder tile and the tools tile open beside the menu and leave the menu up: picking
+        // from them is a second step, and closing the ring underneath would make it look like the
         // click had already done something.
-        viewModel.FolderListRequested += (_, _) => ToggleFolderList();
+        viewModel.FolderListRequested += (_, _) => ToggleBesideRing(FolderList, _folderListClosedAt);
+        viewModel.ToolBoxRequested += (_, _) => ToggleBesideRing(ToolBox, _toolBoxClosedAt);
 
         viewModel.PropertyChanged += (_, e) =>
         {
@@ -157,7 +163,7 @@ public partial class LauncherWindow : Window
     private void ReleaseMenuBitmap() => Menu.CacheMode = null;
 
     /// <summary>
-    /// Opens the folder list clear of the ring, or shuts it if it is already up.
+    /// Opens the folder list or the tools box clear of the ring, or shuts it if it is already up.
     ///
     /// The popup is placed against the centre icon, which is the only element that stays put, so
     /// the offset has to carry it past the tiles: out to the ring, plus half a tile for the one
@@ -165,26 +171,26 @@ public partial class LauncherWindow : Window
     /// Negative because it goes to the left, and all three sizes are settings the user can move,
     /// so it is worked out each time rather than written into the markup.
     ///
-    /// The guard is what makes a second press on the tile close the list. The popup does not
+    /// The guard is what makes a second press on the tile close the popup. The popup does not
     /// stay open when something else is clicked, so by the time the tile's click arrives the
     /// popup has already shut itself and reopening would look like the press did nothing.
     /// </summary>
-    private void ToggleFolderList()
+    private void ToggleBesideRing(Popup popup, DateTime closedAt)
     {
-        if (FolderList.IsOpen)
+        if (popup.IsOpen)
         {
-            FolderList.IsOpen = false;
+            popup.IsOpen = false;
             return;
         }
 
-        if ((DateTime.UtcNow - _folderListClosedAt).TotalMilliseconds < 250) return;
+        if ((DateTime.UtcNow - closedAt).TotalMilliseconds < 250) return;
 
         LauncherAppearance look = ViewModel.Appearance;
 
-        FolderList.HorizontalOffset =
+        popup.HorizontalOffset =
             -(look.MenuRadius + look.TileSize / 2 - look.IconSize / 2 + 20);
 
-        FolderList.IsOpen = true;
+        popup.IsOpen = true;
     }
 
     // ---- Drag and drop -----------------------------------------------------------------------
@@ -489,6 +495,7 @@ public partial class LauncherWindow : Window
         _menuOpen = false;
         ViewModel.IsExpanded = false;
         FolderList.IsOpen = false;
+        ToolBox.IsOpen = false;
         int token = ++_animationToken;
 
         if (animate)

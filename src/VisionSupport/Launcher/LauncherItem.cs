@@ -11,24 +11,27 @@ namespace VisionSupport.Launcher;
 public sealed partial class LauncherItem : ObservableObject
 {
     private readonly Action _activate;
+    private readonly Func<bool>? _isRunning;
 
+    /// <param name="isRunning">
+    /// For a tile whose ring does not follow one feature - the tools tile. Whoever owns what it
+    /// reads calls <see cref="RefreshRunning"/> when that changes.
+    /// </param>
     public LauncherItem(string glyph, string title, double x, double y,
-                        Action activate, IFeatureModule? module = null)
+                        Action activate, IFeatureModule? module = null,
+                        Func<bool>? isRunning = null)
     {
         Glyph = glyph;
         Title = title;
         X = x;
         Y = y;
         _activate = activate;
+        _isRunning = isRunning;
         Module = module;
 
         if (module is not null)
         {
-            module.Changed += (_, _) =>
-            {
-                OnPropertyChanged(nameof(State));
-                OnPropertyChanged(nameof(IsRunning));
-            };
+            module.Changed += (_, _) => OnPropertyChanged(nameof(IsRunning));
         }
     }
 
@@ -44,10 +47,9 @@ public sealed partial class LauncherItem : ObservableObject
     /// <summary>Null for the overview tile, which is not a feature.</summary>
     public IFeatureModule? Module { get; }
 
-    public FeatureState State => Module?.State ?? FeatureState.Stopped;
+    public bool IsRunning => _isRunning?.Invoke() ?? Module?.IsWorking ?? false;
 
-    public bool IsRunning => State is FeatureState.Running or FeatureState.Starting
-                                   or FeatureState.Paused;
+    public void RefreshRunning() => OnPropertyChanged(nameof(IsRunning));
 
     [RelayCommand]
     private void Activate() => _activate();

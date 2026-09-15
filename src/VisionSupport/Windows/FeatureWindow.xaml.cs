@@ -1,7 +1,7 @@
 using System.ComponentModel;
 using System.Windows;
-using System.Windows.Media;
 using VisionSupport.Features;
+using VisionSupport.Shell;
 
 namespace VisionSupport.Windows;
 
@@ -48,7 +48,13 @@ public partial class FeatureWindow : Window
             ? new CornerRadius(0)
             : (CornerRadius)FindResource("RadiusWindow");
         Closing += OnClosing;
-        Closed += (_, _) => module.Changed -= OnModuleChanged;
+        // Letting go of the view here as well: WPF can keep a closed window referenced for a while
+        // (input and focus bookkeeping), and it should not keep the whole feature with it.
+        Closed += (_, _) =>
+        {
+            module.Changed -= OnModuleChanged;
+            Host.Content = null;
+        };
 
         RefreshCaption();
     }
@@ -68,10 +74,13 @@ public partial class FeatureWindow : Window
     /// <summary>
     /// Decides what closing costs.
     ///
-    /// Stopped or faulted, the feature is not doing anything worth keeping, so it goes away
-    /// completely - threads, sockets, ETW sessions, the lot. Running or paused, only the view is
-    /// dropped and the work carries on in the background, visible on the launcher's ring and
-    /// stoppable from the overview dialog.
+    /// A tool that is not working - no module up, nothing attached, no batch converting - goes
+    /// away completely: threads, sockets, ETW sessions, the lot. One that is working keeps going
+    /// in the background with only its view dropped. The tool's own run state decides, not the
+    /// shell's State, which the tool's own start and stop buttons never touch.
+    ///
+    /// A tool can also refuse outright: an image batch can neither keep going without its window
+    /// nor be cut off without leaving a half-written file. The window then stays and says why.
     ///
     /// The dance with the flags is the one the old shell window needed too: awaiting the teardown
     /// synchronously deadlocks, because the stop path marshals state changes back to the UI
@@ -91,9 +100,16 @@ public partial class FeatureWindow : Window
 
         e.Cancel = true;
         if (_closeRequested) return;
+
+        if (Module.CloseBlockedReason is { } reason)
+        {
+            MessageBox.Show(this, reason, Module.Title, MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
         _closeRequested = true;
 
-        if (Module.State is FeatureState.Running or FeatureState.Paused)
+        if (Module.IsWorking)
         {
             Module.ReleaseView();
         }
@@ -106,31 +122,11 @@ public partial class FeatureWindow : Window
         await Dispatcher.BeginInvoke(Close);
     }
 
-    private void OnModuleChanged(object? sender, EventArgs e)
-    {
-        RefreshCaption();
-
-        // A feature that stopped on its own - from a button inside its own view - has dropped the
-        // control this window is showing. Rebuild it, or the last chart stays on screen looking
-        // live. Not while closing: that would resurrect the view we just released.
-        if (!_closeRequested && Module.State is FeatureState.Stopped or FeatureState.Faulted)
-        {
-            Host.Content = Module.GetOrCreateView();
-        }
-    }
+    private void OnModuleChanged(object? sender, EventArgs e) => RefreshCaption();
 
     private void RefreshCaption()
     {
         StatusText.Text = Module.StatusLine;
-
-        string key = Module.State switch
-        {
-            FeatureState.Running or FeatureState.Starting => "StateRunning",
-            FeatureState.Paused or FeatureState.Stopping => "StatePaused",
-            FeatureState.Faulted => "StateFaulted",
-            _ => "StateStopped",
-        };
-
-        StateDot.Fill = Application.Current?.TryFindResource(key) as Brush ?? Brushes.Gray;
+        StateDot.Fill = FeatureBrushes.For(Module);
     }
 }

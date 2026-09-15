@@ -29,12 +29,6 @@ public interface IFeatureModule
     /// </summary>
     string StatusLine { get; }
 
-    /// <summary>
-    /// False for features where pausing has no meaning, so the shell can disable the button
-    /// rather than offer a control that does nothing.
-    /// </summary>
-    bool CanPause { get; }
-
     /// <summary>Raised when <see cref="State"/> or <see cref="StatusLine"/> changes. May arrive on any thread.</summary>
     event EventHandler? Changed;
 
@@ -68,11 +62,23 @@ public interface IFeatureModule
     /// </summary>
     void ReleaseView();
 
-    Task StartAsync();
+    /// <summary>
+    /// Whether the tool underneath is actually doing something right now - a PLC module up, a
+    /// target attached, a batch converting. Closing the feature's window keeps a working feature
+    /// alive and releases one that is not.
+    ///
+    /// Read from the tool itself rather than from <see cref="State"/>: each tool has its own start
+    /// and stop buttons, and pressing those never changes State.
+    /// </summary>
+    bool IsWorking { get; }
 
-    Task PauseAsync();
-
-    Task ResumeAsync();
+    /// <summary>
+    /// Why the feature's window must not close right now, or null when it may. Set while the tool
+    /// is in the middle of something that can neither carry on without its window nor be cut off
+    /// safely - an image batch half written to disk. The window shows this instead of closing,
+    /// and the launcher refuses to exit for the same reason.
+    /// </summary>
+    string? CloseBlockedReason { get; }
 
     /// <summary>Full teardown. Never throws.</summary>
     Task StopAsync();

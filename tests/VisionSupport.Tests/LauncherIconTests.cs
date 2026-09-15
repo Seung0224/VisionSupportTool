@@ -12,7 +12,8 @@ namespace VisionSupport.Tests;
 /// happen by someone running the app and squinting at it.
 ///
 /// It covers the shipped link tile too - that one's icon is a string in a settings file, which is
-/// even easier to get wrong than a string in code.
+/// even easier to get wrong than a string in code - and the tools box, whose icons are not on the
+/// ring at all.
 /// </summary>
 public class LauncherIconTests
 {
@@ -21,17 +22,13 @@ public class LauncherIconTests
     {
         var settings = new LauncherSettings();
         var launcher = new LauncherViewModel(
-            new IFeatureModule[]
-            {
-                new MemoryMonitorFeature(),
-                new PlcServerFeature(),
-                new ImageConverterFeature(),
-            },
+            new IFeatureModule[] { new ImageConverterFeature() },
+            new IFeatureModule[] { new MemoryMonitorFeature(), new PlcServerFeature() },
             new ActivityLog(), settings, new LauncherAppearance(settings), DateTime.Now);
 
         Assert.NotEmpty(launcher.Items);
 
-        foreach (LauncherItem item in launcher.Items)
+        foreach (LauncherItem item in launcher.Items.Concat(launcher.Tools))
         {
             Assert.True(Enum.TryParse(item.Glyph, out PackIconMaterialKind _),
                 $"'{item.Title}' 타일의 아이콘 이름 '{item.Glyph}' 이(가) PackIconMaterialKind에 없습니다.");

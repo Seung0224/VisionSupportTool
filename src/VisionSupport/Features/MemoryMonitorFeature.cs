@@ -8,11 +8,10 @@ namespace VisionSupport.Features;
 /// <summary>
 /// The managed-heap monitor as a hosted feature.
 ///
-/// Start attaches to whatever target is picked in the page's toolbar; pause stops sampling but
-/// holds the ClrMD attach and both ETW sessions open, so resuming continues the same chart
-/// instead of starting a new one. Stop is the one that matters for the shell's health: it
-/// detaches, closes the ETW sessions and releases the target handle, because an ETW session
-/// outlives the process that made it and a leaked one costs the whole machine until reboot.
+/// Attaching and detaching happen from the monitor's own toolbar; the shell only asks whether it
+/// is attached. Stop is the one that matters for the shell's health: it detaches, closes the ETW
+/// sessions and releases the target handle, because an ETW session outlives the process that made
+/// it and a leaked one costs the whole machine until reboot.
 /// </summary>
 public sealed class MemoryMonitorFeature : FeatureModule
 {
@@ -28,6 +27,8 @@ public sealed class MemoryMonitorFeature : FeatureModule
     public override Size PreferredWindowSize => new(1280, 820);
 
     public override string StatusLine => _viewModel?.Status ?? string.Empty;
+
+    public override bool IsWorking => _viewModel is { IsAttached: true };
 
     /// <summary>
     /// Built on first use: constructing it kicks off a scan of every process on the machine,
@@ -56,24 +57,6 @@ public sealed class MemoryMonitorFeature : FeatureModule
         var view = new MonitorView(ViewModel);
         view.WindowOpened += (_, window) => TrackWindow(window);
         return view;
-    }
-
-    protected override Task OnStartAsync(CancellationToken ct)
-    {
-        ViewModel.StartMonitoring();
-        return Task.CompletedTask;
-    }
-
-    protected override Task OnPauseAsync()
-    {
-        _viewModel?.PauseSampling();
-        return Task.CompletedTask;
-    }
-
-    protected override Task OnResumeAsync()
-    {
-        _viewModel?.ResumeSampling();
-        return Task.CompletedTask;
     }
 
     protected override Task OnStopAsync()

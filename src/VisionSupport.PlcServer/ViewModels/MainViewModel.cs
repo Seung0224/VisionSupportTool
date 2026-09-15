@@ -199,49 +199,13 @@ namespace VirtualPlcServer.ViewModels
 
         // ---- host controls ---------------------------------------------------
         //
-        // What the support shell's command bar drives. The hub still owns what a module is and
-        // when it runs; these just apply one intent across every module at once.
+        // What the support shell reads and calls. Modules are started and stopped from their own
+        // banners; the shell only asks whether any is up, and releases the board when none is.
 
         /// <summary>Raised when any banner opens a detail window, so the host can close it on teardown.</summary>
         public event EventHandler<System.Windows.Window> DetailWindowOpened;
 
         public int RunningCount => Modules.Count(vm => vm.IsRunning);
-
-        /// <summary>Starts every module that is not already running.</summary>
-        public async System.Threading.Tasks.Task StartAllAsync()
-        {
-            foreach (ModuleViewModel vm in Modules.ToList())
-            {
-                if (vm.IsRunning) continue;
-                await vm.Module.StartAsync();
-            }
-        }
-
-        /// <summary>
-        /// Stops every running module and returns which ones were running, so a later resume can
-        /// bring back exactly that set rather than starting everything. Node values survive:
-        /// StopAsync closes the sockets but does not touch the map - only ReinitializeAsync does.
-        /// </summary>
-        public async System.Threading.Tasks.Task<IReadOnlyList<Guid>> StopAllAsync()
-        {
-            var wasRunning = new List<Guid>();
-            foreach (ModuleViewModel vm in Modules.ToList())
-            {
-                if (vm.IsRunning) wasRunning.Add(vm.Module.Id);
-                await vm.Module.StopAsync();
-            }
-
-            return wasRunning;
-        }
-
-        /// <summary>Restarts exactly the modules named, ignoring any that have since been deleted.</summary>
-        public async System.Threading.Tasks.Task StartAsync(IReadOnlyList<Guid> ids)
-        {
-            foreach (ModuleViewModel vm in Modules.ToList())
-            {
-                if (ids.Contains(vm.Module.Id)) await vm.Module.StartAsync();
-            }
-        }
 
         /// <summary>Releases every module. Saves first, so runtime value changes survive a restart.</summary>
         public async System.Threading.Tasks.Task DisposeAllAsync()
@@ -252,6 +216,11 @@ namespace VirtualPlcServer.ViewModels
                 await vm.Module.StopAsync();
                 vm.Module.Dispose();
             }
+
+            // Last, and not in a finally: the engine's running timer is what holds this whole board
+            // in memory, but if a module failed to stop the board is kept and reused, and its
+            // scenarios still need the timer.
+            _scenarioEngine.Dispose();
         }
 
         private static readonly JsonSerializer ConfigSerializer = JsonSerializer.Create(

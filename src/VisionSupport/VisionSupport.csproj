@@ -35,6 +35,17 @@
     <ProjectReference Include="..\VisionSupport.MemoryMonitor\VisionSupport.MemoryMonitor.csproj" />
     <ProjectReference Include="..\VisionSupport.PlcServer\VisionSupport.PlcServer.csproj" />
     <ProjectReference Include="..\VisionSupport.ImageConverter\VisionSupport.ImageConverter.csproj" />
+    <ProjectReference Include="..\VisionSupport.Sam\VisionSupport.Sam.csproj" />
   </ItemGroup>
+
+  <!-- The DirectML and ONNX Runtime packages ship debug symbols and an import library as native
+       assets. Neither is used at run time, and a single-file publish cannot bundle them, so they
+       would sit loose beside the exe. -->
+  <Target Name="DropNativeDebugFilesFromPublish" AfterTargets="ComputeResolvedFilesToPublishList">
+    <ItemGroup>
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)"
+                             Condition="'%(Extension)' == '.pdb' Or '%(Extension)' == '.lib'" />
+    </ItemGroup>
+  </Target>
 
 </Project>

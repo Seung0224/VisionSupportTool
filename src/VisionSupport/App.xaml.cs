@@ -41,7 +41,8 @@ public partial class App : Application
         DropElevation.AllowDropMessages();
 
         var appearance = new LauncherAppearance(_settings);
-        var launcher = new LauncherViewModel(CreateModules(), _activity, _settings, appearance, _startedAt);
+        var launcher = new LauncherViewModel(CreateModules(), CreateTools(),
+                                             _activity, _settings, appearance, _startedAt);
         new LauncherWindow(launcher, _settings).Show();
     }
 
@@ -114,14 +115,19 @@ public partial class App : Application
     }
 
     /// <summary>
-    /// The features this shell hosts, in nav rail order. The only place that knows which
-    /// features exist - adding one is a line here plus its module class.
+    /// The features with a tile of their own on the ring. With <see cref="CreateTools"/>, the only
+    /// place that knows which features exist - adding one is a line in either plus its module class.
     /// </summary>
     private static IReadOnlyList<IFeatureModule> CreateModules() => new List<IFeatureModule>
     {
+        new ImageConverterFeature(),
+    };
+
+    /// <summary>The features that open from the tools box, in box order.</summary>
+    private static IReadOnlyList<IFeatureModule> CreateTools() => new List<IFeatureModule>
+    {
         new MemoryMonitorFeature(),
         new PlcServerFeature(),
-        new ImageConverterFeature(),
     };
 
     private void OnDispatcherUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)

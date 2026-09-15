@@ -1,10 +1,13 @@
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using System.Windows;
+using System.Windows.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using VisionSupport.Archive;
 using VisionSupport.Features;
 using VisionSupport.Overview;
+using VisionSupport.Sam;
 using VisionSupport.Shell;
 using VisionSupport.Windows;
 
@@ -19,7 +22,13 @@ namespace VisionSupport.Launcher;
 /// </summary>
 public sealed partial class LauncherViewModel : ObservableObject
 {
+    /// <summary>Every feature, on the ring or in the tools box. Exit and the overview go through
+    /// all of them.</summary>
     private readonly IReadOnlyList<IFeatureModule> _modules;
+
+    /// <summary>The features with a tile of their own.</summary>
+    private readonly IReadOnlyList<IFeatureModule> _ringModules;
+
     private readonly ActivityLog _activity;
     private readonly LauncherSettings _settings;
     private readonly DateTime _startedAt;
@@ -28,25 +37,35 @@ public sealed partial class LauncherViewModel : ObservableObject
     private OverviewDialog? _overview;
     private LinksDialog? _links;
 
+    /// <summary>Kept for its running ring, which follows no single feature.</summary>
+    private LauncherItem? _toolsItem;
+
     [ObservableProperty]
     private bool _isExpanded;
 
-    public LauncherViewModel(IReadOnlyList<IFeatureModule> modules, ActivityLog activity,
-                             LauncherSettings settings, LauncherAppearance appearance,
-                             DateTime startedAt)
+    /// <param name="modules">Features with a tile of their own on the ring.</param>
+    /// <param name="tools">Features that open from the tools box instead.</param>
+    public LauncherViewModel(IReadOnlyList<IFeatureModule> modules, IReadOnlyList<IFeatureModule> tools,
+                             ActivityLog activity, LauncherSettings settings,
+                             LauncherAppearance appearance, DateTime startedAt)
     {
-        _modules = modules;
+        // Tools first, so the overview lists them where they used to sit on the ring.
+        _modules = tools.Concat(modules).ToList();
+        _ringModules = modules;
         _activity = activity;
         _settings = settings;
         _startedAt = startedAt;
         Appearance = appearance;
         Drops = new DropCoordinator(settings, activity);
 
-        foreach (IFeatureModule module in modules)
+        foreach (IFeatureModule module in _modules)
         {
             module.Changed += OnModuleChanged;
             _activity.Add(module.Title, "준비됨");
         }
+
+        Tools = tools.Select(tool => new LauncherItem(tool.Glyph, tool.Title, 0, 0, () => Open(tool), tool))
+                     .ToList();
 
         List<LauncherLink> saved = settings.Links ?? LauncherLink.Defaults();
         WebLinks = new ObservableCollection<LauncherLink>(saved.Where(l => l.Kind == LinkKind.Web));
@@ -84,8 +103,10 @@ public sealed partial class LauncherViewModel : ObservableObject
         // Web links get a tile each; folders share one, because a dozen of them would crowd the
         // ring out of usefulness. The folder tile opens a list of its own instead.
         bool hasFolders = FolderLinks.Count > 0;
+
+        // The three that are always there: the tools tile, the cutout tile and the overview.
         Point[] offsets = RadialLayout.Offsets(
-            _modules.Count + WebLinks.Count + (hasFolders ? 1 : 0) + 1, Appearance.MenuRadius);
+            _ringModules.Count + WebLinks.Count + (hasFolders ? 1 : 0) + 3, Appearance.MenuRadius);
 
         // A tile is the whole item now, so both axes centre on the tile.
         double centre = Appearance.MenuSize / 2 - Appearance.TileSize / 2;
@@ -94,12 +115,23 @@ public sealed partial class LauncherViewModel : ObservableObject
 
         int slot = 0;
 
-        foreach (IFeatureModule module in _modules)
+        // The tools share one tile and open a box beside the ring, like the folders.
+        Point toolsAt = offsets[slot++];
+        _toolsItem = new LauncherItem("Toolbox", "도구", centreX + toolsAt.X, centreY + toolsAt.Y,
+            () => ToolBoxRequested?.Invoke(this, EventArgs.Empty),
+            isRunning: () => Tools.Any(tool => tool.IsRunning));
+        Items.Add(_toolsItem);
+
+        foreach (IFeatureModule module in _ringModules)
         {
             Point at = offsets[slot++];
             Items.Add(new LauncherItem(module.Glyph, module.Title,
                 centreX + at.X, centreY + at.Y, () => Open(module), module));
         }
+
+        // A mode rather than a window: the screen dims and whatever is under the cursor can be cut out.
+        Point cutoutAt = offsets[slot++];
+        Items.Add(new LauncherItem("ContentCut", "누끼", centreX + cutoutAt.X, centreY + cutoutAt.Y, StartCutout));
 
         foreach (LauncherLink link in WebLinks)
         {
@@ -137,6 +169,15 @@ public sealed partial class LauncherViewModel : ObservableObject
     /// <summary>Raised when the folder tile is pressed, for the window to show the list.</summary>
     public event EventHandler? FolderListRequested;
 
+    /// <summary>
+    /// The tools box: features that open from a small grid beside the ring rather than from a
+    /// tile of their own. Built once - nothing about the box moves when links are added.
+    /// </summary>
+    public IReadOnlyList<LauncherItem> Tools { get; }
+
+    /// <summary>Raised when the tools tile is pressed, for the window to show the box.</summary>
+    public event EventHandler? ToolBoxRequested;
+
     /// <summary>The icon's colour, opacity and size. Shared with the overview dialog, which is
     /// where they are changed.</summary>
     public LauncherAppearance Appearance { get; }
@@ -151,9 +192,7 @@ public sealed partial class LauncherViewModel : ObservableObject
     public event EventHandler? CollapseNowRequested;
 
     /// <summary>Drives the ring around the icon: something is up even with every window closed.</summary>
-    public bool AnyRunning => _modules.Any(m => m.State is FeatureState.Running
-                                                       or FeatureState.Starting
-                                                       or FeatureState.Paused);
+    public bool AnyRunning => _modules.Any(m => m.IsWorking);
 
     [RelayCommand]
     public void ShowOverview()
@@ -175,9 +214,19 @@ public sealed partial class LauncherViewModel : ObservableObject
     /// <summary>
     /// Stops every feature and ends the process. Windows are force-closed first: their normal
     /// close path would run the stop-or-release decision again and race this teardown.
+    ///
+    /// Refused, like a window's own close, while a feature says it must not be cut off.
     /// </summary>
     public async Task ExitAsync()
     {
+        foreach (IFeatureModule module in _modules)
+        {
+            if (module.CloseBlockedReason is not { } reason) continue;
+
+            MessageBox.Show(reason, module.Title, MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
         foreach (FeatureWindow window in _open.Values.ToArray()) window.ForceClose();
         _open.Clear();
 
@@ -280,9 +329,52 @@ public sealed partial class LauncherViewModel : ObservableObject
         }
 
         var window = new FeatureWindow(module);
-        window.Closed += (_, _) => _open.Remove(module);
+        window.Closed += (_, _) =>
+        {
+            _open.Remove(module);
+            ReclaimMemory(module.Title);
+        };
         _open[module] = window;
         window.Show();
+    }
+
+    /// <summary>
+    /// Hands a closed feature's memory back to Windows straight away.
+    ///
+    /// Closing a feature only makes its objects unreachable - the GC decides when they actually
+    /// go, and it runs when something allocates. With just the launcher left almost nothing does,
+    /// so a closed image converter's decoded bitmaps (large-object-heap arrays, plus native WIC
+    /// buffers only a finalizer frees) sat there indefinitely, and a PLC board went whenever
+    /// something else happened to trigger a collection. A window closing is rare and the user is
+    /// watching the number, so this is the one place a forced collection earns its pause.
+    /// Aggressive mode also decommits what it frees instead of keeping it for later.
+    ///
+    /// Waits for ContextIdle first: Closed fires while the window's teardown is still unwinding,
+    /// and until it has the view is reachable through it. The collection itself runs off the UI
+    /// thread, so waiting for finalizers cannot block the one thread some of them need. The
+    /// before/after figures go to the activity log, so a close that freed nothing shows up.
+    /// </summary>
+    private async void ReclaimMemory(string title)
+    {
+        await Dispatcher.Yield(DispatcherPriority.ContextIdle);
+
+        long before = PrivateBytes();
+        await Task.Run(() =>
+        {
+            GC.Collect(GC.MaxGeneration, GCCollectionMode.Aggressive, blocking: true, compacting: true);
+            GC.WaitForPendingFinalizers();
+            GC.Collect(GC.MaxGeneration, GCCollectionMode.Aggressive, blocking: true, compacting: true);
+        });
+
+        _activity.Add(title, $"창 닫힘 · 메모리 {before / Megabyte} MB → {PrivateBytes() / Megabyte} MB");
+    }
+
+    private const long Megabyte = 1024 * 1024;
+
+    private static long PrivateBytes()
+    {
+        using Process self = Process.GetCurrentProcess();
+        return self.PrivateMemorySize64;
     }
 
     /// <summary>Records that Windows refused to open this window to drags from Explorer.</summary>
@@ -294,9 +386,35 @@ public sealed partial class LauncherViewModel : ObservableObject
             ? $"항목 {fileCount}개 감지"
             : fileCount == 0 ? "파일이 아닌 내용" : "작업 중이라 거부");
 
+    /// <summary>
+    /// Runs the cutout mode and shows what it picked beside the point it was picked at.
+    ///
+    /// The menu shuts at once rather than animating out: the overlay paints a live capture of the
+    /// screen, and a menu caught half-way through closing would be in it.
+    /// </summary>
+    private async void StartCutout()
+    {
+        CollapseNowRequested?.Invoke(this, EventArgs.Empty);
+
+        CutoutResult result = await CutoutSession.RunAsync(new ModelStore());
+
+        if (result is { End: CutoutEnd.Picked, Image: { } image })
+        {
+            new CutoutViewer(image).ShowNear(result.CursorX, result.CursorY);
+            _activity.Add("누끼", $"따기 {image.Width}×{image.Height}");
+        }
+        else if (result.End == CutoutEnd.Failed)
+        {
+            string error = result.Error ?? "알 수 없는 오류";
+            _activity.Add("누끼", error);
+            MessageBox.Show(error, "누끼", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
     private void OnModuleChanged(object? sender, EventArgs e)
     {
         OnPropertyChanged(nameof(AnyRunning));
+        _toolsItem?.RefreshRunning();
 
         if (sender is FeatureModule { State: FeatureState.Faulted } faulted)
         {

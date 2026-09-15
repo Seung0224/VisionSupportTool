@@ -8,7 +8,6 @@
                 <ResourceDictionary Source="Theme/Dark.xaml"/>
             </ResourceDictionary.MergedDictionaries>
 
-            <shell:StateBrushConverter x:Key="StateBrush"/>
             <shell:StateTextConverter x:Key="StateText"/>
             <shell:BoolToVisibilityConverter x:Key="BoolToVis"/>
             <shell:EmptyToVisibilityConverter x:Key="EmptyToVis"/>

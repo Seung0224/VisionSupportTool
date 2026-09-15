@@ -13,7 +13,7 @@ namespace VirtualPlcServer.Scenarios
     /// 활성화된 시나리오들의 규칙을 실제로 실행하는 엔진. OnChange/OnCompare 규칙은 대상 모듈의
     /// Map.ValueChanged 이벤트를 구독해서 반응하고, OnTimer 규칙은 공용 타이머 하나로 처리한다.
     /// </summary>
-    public sealed class ScenarioEngine
+    public sealed class ScenarioEngine : IDisposable
     {
         private const int MaxChainDepth = 20;
 
@@ -57,6 +57,17 @@ namespace VirtualPlcServer.Scenarios
         /// <summary>보드에 모듈이 추가/삭제될 때마다 호출해서 구독을 다시 맞춘다.</summary>
         public void NotifyModulesChanged()
         {
+            Resync();
+        }
+
+        /// <summary>
+        /// 타이머를 멈추고 맵 구독을 푼다. 켜진 DispatcherTimer는 Dispatcher가 붙잡고 있어서, 멈추지 않으면
+        /// 엔진과 엔진이 가리키는 보드(모든 모듈)가 창을 닫은 뒤에도 GC되지 않는다.
+        /// </summary>
+        public void Dispose()
+        {
+            _timer.Stop();
+            _activeScenarios.Clear();
             Resync();
         }
 

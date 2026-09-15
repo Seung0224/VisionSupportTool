@@ -10,10 +10,10 @@ namespace VisionSupport.Features;
 /// <summary>
 /// The image converter as a hosted feature.
 ///
-/// It has no server, no attach, no background pump - a conversion runs only while the user is
-/// watching it - so start and stop are near-empty and pause has no meaning. Stop still matters
-/// for the shell's health in one way: it cancels an in-flight batch and drops the queue, and it
-/// writes the option set back to disk so the next visit opens where this one left off.
+/// It has no server, no attach, no background pump: a conversion runs only while its window is
+/// open, and the window refuses to close mid-batch. Stop still matters for the shell's health in
+/// one way: it drops the queue, and it writes the option set back to disk so the next visit opens
+/// where this one left off.
 /// </summary>
 public sealed class ImageConverterFeature : FeatureModule
 {
@@ -31,9 +31,15 @@ public sealed class ImageConverterFeature : FeatureModule
 
     public override Size PreferredWindowSize => new(980, 700);
 
-    public override bool CanPause => false;
-
     public override string StatusLine => _viewModel?.Summary ?? string.Empty;
+
+    /// <summary>A batch never outlives its window - closing is refused while one runs - so there
+    /// is never anything to keep in the background.</summary>
+    public override bool IsWorking => false;
+
+    public override string? CloseBlockedReason => _viewModel is { IsConverting: true }
+        ? "변환 중에는 닫을 수 없습니다.\n취소하거나 변환이 끝난 뒤 닫아 주세요."
+        : null;
 
     /// <summary>
     /// Built on first use: loading settings reads a file and probing for the Cognex plugin walks
@@ -55,12 +61,6 @@ public sealed class ImageConverterFeature : FeatureModule
     }
 
     protected override UserControl CreateView() => new ImageConverterView(ViewModel);
-
-    protected override Task OnStartAsync(CancellationToken ct) => Task.CompletedTask;
-
-    protected override Task OnPauseAsync() => Task.CompletedTask;
-
-    protected override Task OnResumeAsync() => Task.CompletedTask;
 
     protected override Task OnStopAsync()
     {

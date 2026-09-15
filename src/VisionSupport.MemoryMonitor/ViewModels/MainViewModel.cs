@@ -187,42 +187,6 @@ public partial class MainViewModel : ObservableObject, IDisposable
         LiveManagedTotal = LiveGen0 = LiveGen1 = LiveGen2 = LiveLoh = LivePrivate = "";
     }
 
-    // ---- host controls ---------------------------------------------------
-    //
-    // The three entry points the support shell's command bar drives. They are deliberately thin
-    // wrappers: the shell decides when a feature runs, this class still decides what running
-    // means.
-
-    /// <summary>Shell "실행". Attaches to whatever target is selected in the toolbar.</summary>
-    public void StartMonitoring()
-    {
-        if (SelectedProcess is null)
-        {
-            Status = "감시할 프로세스를 먼저 목록에서 고르세요.";
-            return;
-        }
-
-        Attach();
-    }
-
-    /// <summary>
-    /// Shell "정지". Stops sampling but keeps the ClrMD attach and both ETW sessions open, so
-    /// resuming picks up where it left off instead of re-attaching and losing the history.
-    /// </summary>
-    public void PauseSampling()
-    {
-        if (!IsAttached) return;
-        _timer.Stop();
-        Status = "정지됨 — 대상에 붙어 있는 상태는 유지됩니다. 실행을 누르면 이어서 수집합니다.";
-    }
-
-    public void ResumeSampling()
-    {
-        if (!IsAttached) return;
-        _timer.Start();
-        Status = $"{SelectedProcess?.Name} ({SelectedProcess?.Pid}) 감시 중";
-    }
-
     /// <summary>Starts an executable and attaches to it once its CLR is up.</summary>
     [RelayCommand]
     private async Task LaunchAndAttachAsync()
