@@ -47,8 +47,7 @@ public sealed class ModelStore
     }
 
     public static string DefaultFolder => Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-        "VisionSupport", "Sam", "sam3-tracker-fp16");
+        @"D:\Datas", "VisionSupport", "Sam", "sam3-tracker-fp16");
 
     public string Folder { get; }
 

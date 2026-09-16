@@ -80,6 +80,16 @@ public sealed class LauncherSettings
     public List<LauncherLink>? Links { get; set; }
 
     public static string DefaultPath => Path.Combine(
+        @"D:\Datas", "VisionSupport", "launcher.json");
+
+    /// <summary>
+    /// 설정을 %AppData%에 두던 시절의 경로. <see cref="DefaultPath"/>에 파일이 없을 때만 대신 읽는다.
+    ///
+    /// 이게 없으면 구버전 exe를 쓰다가 새 exe로 넘어오는 순간, 저장해둔 링크와 아이콘 위치가
+    /// 통째로 사라진 것처럼 보인다 - 파일이 없다는 것과 처음 실행이라는 것을 구분하지 못하기 때문이다.
+    /// 읽기만 여기서 하고 저장은 항상 새 경로로 가므로, 한 번 실행하면 자연스럽게 옮겨진다.
+    /// </summary>
+    private static string LegacyPath => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
         "VisionSupport", "launcher.json");
 
@@ -98,6 +108,13 @@ public sealed class LauncherSettings
 
     private static LauncherSettings Read(string path)
     {
+        // 새 경로에 없으면 예전 경로의 설정을 이어받는다. 기본 경로로 읽을 때만 해당한다 -
+        // 테스트가 임시 파일 경로를 넘길 때까지 %AppData%를 뒤지면 안 된다.
+        if (!File.Exists(path) && path == DefaultPath && File.Exists(LegacyPath))
+        {
+            path = LegacyPath;
+        }
+
         try
         {
             if (!File.Exists(path)) return new LauncherSettings();
@@ -107,7 +124,25 @@ public sealed class LauncherSettings
         }
         catch (Exception ex) when (ex is IOException or JsonException or UnauthorizedAccessException)
         {
+            // 깨진 파일을 그대로 두면 다음 저장 때 조용히 덮여서 복구할 길이 없어진다.
+            // 옆으로 치워두면 최소한 되살릴 수는 있다.
+            TryPreserveUnreadable(path);
             return new LauncherSettings();
+        }
+    }
+
+    private static void TryPreserveUnreadable(string path)
+    {
+        try
+        {
+            if (File.Exists(path))
+            {
+                File.Move(path, path + ".unreadable-" + DateTime.Now.ToString("yyyyMMdd-HHmmss"));
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // 치워두지 못하는 것 자체로 실행을 막을 이유는 없다.
         }
     }
 

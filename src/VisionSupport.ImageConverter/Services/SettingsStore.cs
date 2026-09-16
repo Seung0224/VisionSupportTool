@@ -20,18 +20,39 @@ public sealed class SettingsStore
 
     private readonly string _filePath;
 
-    public SettingsStore(string filePath) => _filePath = filePath;
+    /// <summary>설정을 %AppData%에 두던 시절의 경로. 새 경로에 파일이 없을 때만 대신 읽는다.
+    /// 테스트가 임시 경로를 주입할 때는 null이라 예전 경로를 건드리지 않는다.</summary>
+    private readonly string? _legacyFilePath;
 
-    public static SettingsStore Default => new(Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-        "VisionSupport", "ImageConverter", "settings.json"));
+    public SettingsStore(string filePath) : this(filePath, null)
+    {
+    }
+
+    private SettingsStore(string filePath, string? legacyFilePath)
+    {
+        _filePath = filePath;
+        _legacyFilePath = legacyFilePath;
+    }
+
+    public static SettingsStore Default => new(
+        Path.Combine(@"D:\Datas", "VisionSupport", "ImageConverter", "settings.json"),
+        Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+            "VisionSupport", "ImageConverter", "settings.json"));
 
     public ImageConverterSettings Load()
     {
         try
         {
-            if (!File.Exists(_filePath)) return new ImageConverterSettings();
-            string json = File.ReadAllText(_filePath);
+            string path = _filePath;
+            if (!File.Exists(path) && _legacyFilePath is not null && File.Exists(_legacyFilePath))
+            {
+                // 예전 경로에 남아있는 설정을 이어받는다. 저장은 항상 새 경로로 간다.
+                path = _legacyFilePath;
+            }
+
+            if (!File.Exists(path)) return new ImageConverterSettings();
+            string json = File.ReadAllText(path);
             return JsonSerializer.Deserialize<ImageConverterSettings>(json, JsonOptions)
                 ?? new ImageConverterSettings();
         }

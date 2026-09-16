@@ -161,8 +161,7 @@ namespace VirtualPlcServer.Protocols.OpcUa
         private ApplicationConfiguration BuildConfiguration()
         {
             string baseDirectory = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                "VirtualPlcServer", "OpcUa");
+                @"D:\Datas", "VisionSupport", "VirtualPlcServer", "OpcUa");
 
             var configuration = new ApplicationConfiguration
             {
