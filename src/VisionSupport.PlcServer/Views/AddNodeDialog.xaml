@@ -28,6 +28,12 @@
             <ComboBoxItem Content="Float" />
             <ComboBoxItem Content="Double" />
             <ComboBoxItem Content="String" />
+            <!-- 아래 4개는 PlcDataType의 뒤쪽 값들이다. SelectedIndex를 그대로 enum으로 캐스팅하므로
+                 이 순서는 PlcDataType 선언 순서와 반드시 같아야 한다. -->
+            <ComboBoxItem Content="SByte" />
+            <ComboBoxItem Content="Byte" />
+            <ComboBoxItem Content="UInt16" />
+            <ComboBoxItem Content="UInt32" />
         </ComboBox>
 
         <CheckBox x:Name="IsArrayBox" Content="Array" Margin="0,8" Checked="OnIsArrayChanged" Unchecked="OnIsArrayChanged" />

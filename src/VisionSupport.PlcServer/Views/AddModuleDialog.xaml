@@ -108,6 +108,21 @@
                     <TextBox materialDesign:HintAssist.Hint="Port" Text="{Binding OpcUaPort}" Margin="0,4" />
                     <TextBox materialDesign:HintAssist.Hint="Application Name" Text="{Binding OpcUaAppName}" Margin="0,4" />
                     <CheckBox Content="Seed default Jastech nodes" IsChecked="{Binding OpcUaSeedJastechNodes}" Margin="0,8,0,0" />
+
+                    <!-- 설정 파일을 고르면 그 파일 기준으로 노드를 만든다(기본 노드 대신). 비워두면 위 체크박스대로 동작. -->
+                    <Grid Margin="0,8,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBox Grid.Column="0" IsReadOnly="True" Text="{Binding OpcUaCfgPath}"
+                                 materialDesign:HintAssist.Hint="Node config file (blank = default nodes)" />
+                        <Button Grid.Column="1" Content="BROWSE" Click="OnBrowseCfgClicked"
+                                Style="{StaticResource MaterialDesignFlatButton}" Margin="8,0,0,0" />
+                        <Button Grid.Column="2" Content="CLEAR" Click="OnClearCfgClicked"
+                                Style="{StaticResource MaterialDesignFlatButton}" Margin="4,0,0,0" />
+                    </Grid>
                 </StackPanel>
 
                 <!-- ADS fields -->

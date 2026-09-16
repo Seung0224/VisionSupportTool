@@ -24,7 +24,7 @@ namespace VirtualPlcServer.Views
 
             var dialog = new WriteValueDialog(row.AddressDisplay, row.Value);
             object result = await DialogHost.Show(dialog, "MonitorDialog");
-            if (result is ushort newValue)
+            if (result is short newValue)
             {
                 viewModel.WriteValue(row.Address, newValue);
             }

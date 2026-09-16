@@ -40,6 +40,10 @@ namespace VirtualPlcServer.Protocols.Common
                 case PlcDataType.Float: return typeof(float);
                 case PlcDataType.Double: return typeof(double);
                 case PlcDataType.String: return typeof(string);
+                case PlcDataType.SByte: return typeof(sbyte);
+                case PlcDataType.Byte: return typeof(byte);
+                case PlcDataType.UInt16: return typeof(ushort);
+                case PlcDataType.UInt32: return typeof(uint);
                 default: throw new ArgumentOutOfRangeException(nameof(dataType));
             }
         }
@@ -54,6 +58,10 @@ namespace VirtualPlcServer.Protocols.Common
                 case PlcDataType.Float: return 0f;
                 case PlcDataType.Double: return 0d;
                 case PlcDataType.String: return string.Empty;
+                case PlcDataType.SByte: return (sbyte)0;
+                case PlcDataType.Byte: return (byte)0;
+                case PlcDataType.UInt16: return (ushort)0;
+                case PlcDataType.UInt32: return 0u;
                 default: throw new ArgumentOutOfRangeException(nameof(dataType));
             }
         }

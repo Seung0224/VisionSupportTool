@@ -168,6 +168,10 @@ namespace VirtualPlcServer.Protocols.OpcUa
                 case PlcDataType.Float: return DataTypeIds.Float;
                 case PlcDataType.Double: return DataTypeIds.Double;
                 case PlcDataType.String: return DataTypeIds.String;
+                case PlcDataType.SByte: return DataTypeIds.SByte;
+                case PlcDataType.Byte: return DataTypeIds.Byte;
+                case PlcDataType.UInt16: return DataTypeIds.UInt16;
+                case PlcDataType.UInt32: return DataTypeIds.UInt32;
                 default: throw new ArgumentOutOfRangeException(nameof(dataType));
             }
         }

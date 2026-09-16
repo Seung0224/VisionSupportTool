@@ -20,6 +20,10 @@ namespace VirtualPlcServer.Protocols.Ads
                 case PlcDataType.Float: return 4;
                 case PlcDataType.Double: return 8;
                 case PlcDataType.String: return StringByteLength;
+                case PlcDataType.SByte: return 1;
+                case PlcDataType.Byte: return 1;
+                case PlcDataType.UInt16: return 2;
+                case PlcDataType.UInt32: return 4;
                 default: throw new ArgumentOutOfRangeException(nameof(dataType));
             }
         }
@@ -102,6 +106,24 @@ namespace VirtualPlcServer.Protocols.Ads
                         Array.Copy(bytes, 0, buffer, offset, 8);
                         break;
                     }
+                case PlcDataType.SByte:
+                    buffer[offset] = unchecked((byte)(sbyte)value);
+                    break;
+                case PlcDataType.Byte:
+                    buffer[offset] = (byte)value;
+                    break;
+                case PlcDataType.UInt16:
+                    {
+                        byte[] bytes = BitConverter.GetBytes((ushort)value);
+                        Array.Copy(bytes, 0, buffer, offset, 2);
+                        break;
+                    }
+                case PlcDataType.UInt32:
+                    {
+                        byte[] bytes = BitConverter.GetBytes((uint)value);
+                        Array.Copy(bytes, 0, buffer, offset, 4);
+                        break;
+                    }
                 case PlcDataType.String:
                     {
                         Array.Clear(buffer, offset, StringByteLength);
@@ -128,6 +150,14 @@ namespace VirtualPlcServer.Protocols.Ads
                     return BitConverter.ToSingle(buffer, offset);
                 case PlcDataType.Double:
                     return BitConverter.ToDouble(buffer, offset);
+                case PlcDataType.SByte:
+                    return unchecked((sbyte)buffer[offset]);
+                case PlcDataType.Byte:
+                    return buffer[offset];
+                case PlcDataType.UInt16:
+                    return BitConverter.ToUInt16(buffer, offset);
+                case PlcDataType.UInt32:
+                    return BitConverter.ToUInt32(buffer, offset);
                 case PlcDataType.String:
                     {
                         int len = Array.IndexOf<byte>(buffer, 0, offset, StringByteLength);

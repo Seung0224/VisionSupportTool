@@ -9,7 +9,7 @@ namespace VirtualPlcServer.ViewModels
 {
     public sealed partial class McWordRowViewModel : ObservableObject
     {
-        public McWordRowViewModel(int address, ushort value, string devicePrefix)
+        public McWordRowViewModel(int address, short value, string devicePrefix)
         {
             Address = address;
             DevicePrefix = devicePrefix;
@@ -22,8 +22,13 @@ namespace VirtualPlcServer.ViewModels
 
         public string AddressDisplay => DevicePrefix + Address;
 
+        /// <summary>
+        /// 워드는 16비트 그대로지만 D영역 값은 관례상 부호 있는 정수로 읽는다 - -1을 65535로 보여주면
+        /// 래더에서 보는 값과 달라진다. 저장(McMap)은 ushort 그대로 두고 화면 표시와 입력만 short로
+        /// 해석한다. 둘 다 16비트라 unchecked 캐스트는 비트 패턴을 그대로 두고 해석만 바꾼다.
+        /// </summary>
         [ObservableProperty]
-        private ushort value;
+        private short value;
     }
 
     /// <summary>McPlcServer(UDP)와 McTcpPlcServer(TCP/LS) 둘 다 이 뷰를 그대로 재사용할 수 있도록,
@@ -45,9 +50,9 @@ namespace VirtualPlcServer.ViewModels
 
         public string HeaderInfo { get; }
 
-        public void WriteValue(int address, ushort value)
+        public void WriteValue(int address, short value)
         {
-            _map.WriteWord(address, value);
+            _map.WriteWord(address, unchecked((ushort)value));
         }
 
         public void Detach()
@@ -61,7 +66,7 @@ namespace VirtualPlcServer.ViewModels
             ushort[] values = _map.Snapshot();
             for (int i = 0; i < values.Length; i++)
             {
-                Rows.Add(new McWordRowViewModel(_map.StartAddress + i, values[i], _map.DevicePrefix));
+                Rows.Add(new McWordRowViewModel(_map.StartAddress + i, unchecked((short)values[i]), _map.DevicePrefix));
             }
         }
 
@@ -79,7 +84,7 @@ namespace VirtualPlcServer.ViewModels
                 {
                     if (row.Address == address)
                     {
-                        row.Value = (ushort)e.Value;
+                        row.Value = unchecked((short)(ushort)e.Value);
                         break;
                     }
                 }

@@ -97,6 +97,14 @@ namespace VirtualPlcServer.ViewModels
         [ObservableProperty]
         private bool opcUaSeedJastechNodes = true;
 
+        /// <summary>고른 노드 설정 파일(.cfg) 경로. 비어 있으면 기본 노드로 만든다.</summary>
+        [ObservableProperty]
+        private string opcUaCfgPath = string.Empty;
+
+        /// <summary>설정 파일에서 읽고 배열 길이까지 확인된 노드 목록. 다이얼로그가 ADD 직전에 채워 넣는다.
+        /// 비어 있으면 <see cref="OpcUaSeedJastechNodes"/>에 따라 기본 노드를 쓴다.</summary>
+        public List<CfgNodeInfo> PendingCfgNodes { get; set; }
+
         [ObservableProperty]
         private int adsAmsPort = 27906;
 
@@ -153,12 +161,23 @@ namespace VirtualPlcServer.ViewModels
                     LoadState(protocol, server, ModuleName);
                 }
 
-                if (protocol == ProtocolType.OpcUa && OpcUaSeedJastechNodes && server is OpcUaPlcServer opcUaServer)
+                if (protocol == ProtocolType.OpcUa && server is OpcUaPlcServer opcUaServer)
                 {
-                    // 이미 존재하는 노드(복원된 상태 등)는 건드리지 않고, 없는 것만 기본값으로 채운다.
-                    foreach (var definition in JastechDefaultNodes.GetDefaultNodes())
+                    // 이미 존재하는 노드(복원된 상태 등)는 건드리지 않고, 없는 것만 채운다.
+                    // 설정 파일을 골랐으면 그 파일이 기본 노드를 대신한다.
+                    if (PendingCfgNodes != null && PendingCfgNodes.Count > 0)
                     {
-                        opcUaServer.NodeMap.TryAddNode(definition);
+                        foreach (CfgNodeInfo node in PendingCfgNodes)
+                        {
+                            opcUaServer.NodeMap.TryAddNode(node.ToDefinition());
+                        }
+                    }
+                    else if (OpcUaSeedJastechNodes)
+                    {
+                        foreach (var definition in JastechDefaultNodes.GetDefaultNodes())
+                        {
+                            opcUaServer.NodeMap.TryAddNode(definition);
+                        }
                     }
                 }
 

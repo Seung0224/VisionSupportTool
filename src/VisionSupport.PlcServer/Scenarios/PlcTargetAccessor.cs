@@ -158,6 +158,10 @@ namespace VirtualPlcServer.Scenarios
                 case PlcDataType.Int32: return (int)ToDouble(value);
                 case PlcDataType.Float: return (float)ToDouble(value);
                 case PlcDataType.Double: return ToDouble(value);
+                case PlcDataType.SByte: return (sbyte)ToDouble(value);
+                case PlcDataType.Byte: return (byte)ToDouble(value);
+                case PlcDataType.UInt16: return (ushort)ToDouble(value);
+                case PlcDataType.UInt32: return (uint)ToDouble(value);
                 default: return value?.ToString() ?? string.Empty;
             }
         }
@@ -177,6 +181,10 @@ namespace VirtualPlcServer.Scenarios
                 // 16비트로 되돌려야(63535 -> -2001) 시나리오 트리거 비교("값 < 0" 등)와 액션에 쓰는
                 // 값이 실제 부호와 일치한다.
                 case ushort us: return unchecked((short)us);
+                // OPC UA/ADS 노드에서만 나오는 타입들 - 부호 재해석 없이 값 그대로 쓴다.
+                case sbyte sb: return sb;
+                case byte by: return by;
+                case uint ui: return ui;
                 case string str:
                     return double.TryParse(str, NumberStyles.Float, CultureInfo.InvariantCulture, out double parsed) ? parsed : 0;
                 default:

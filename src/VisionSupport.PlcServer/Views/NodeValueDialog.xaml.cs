@@ -78,6 +78,14 @@ namespace VirtualPlcServer.Views
                     return float.Parse(text, CultureInfo.InvariantCulture);
                 case PlcDataType.Double:
                     return double.Parse(text, CultureInfo.InvariantCulture);
+                case PlcDataType.SByte:
+                    return sbyte.Parse(text, CultureInfo.InvariantCulture);
+                case PlcDataType.Byte:
+                    return byte.Parse(text, CultureInfo.InvariantCulture);
+                case PlcDataType.UInt16:
+                    return ushort.Parse(text, CultureInfo.InvariantCulture);
+                case PlcDataType.UInt32:
+                    return uint.Parse(text, CultureInfo.InvariantCulture);
                 default:
                     return text;
             }
@@ -111,6 +119,14 @@ namespace VirtualPlcServer.Views
                     return float.Parse(text, CultureInfo.InvariantCulture);
                 case PlcDataType.Double:
                     return double.Parse(text, CultureInfo.InvariantCulture);
+                case PlcDataType.SByte:
+                    return sbyte.Parse(text, CultureInfo.InvariantCulture);
+                case PlcDataType.Byte:
+                    return byte.Parse(text, CultureInfo.InvariantCulture);
+                case PlcDataType.UInt16:
+                    return ushort.Parse(text, CultureInfo.InvariantCulture);
+                case PlcDataType.UInt32:
+                    return uint.Parse(text, CultureInfo.InvariantCulture);
                 default:
                     return text;
             }

@@ -12,6 +12,14 @@ namespace VirtualPlcServer.Core
         McTcp
     }
 
+    /// <summary>
+    /// 노드 하나의 값 타입. 순서를 바꾸거나 중간에 끼워 넣으면 안 된다 - AddNodeDialog가 콤보박스의
+    /// SelectedIndex를 이 enum으로 그대로 캐스팅하고, 저장된 스냅샷도 이 값을 숫자로 들고 있다.
+    /// 뒤에 덧붙이는 것만 안전하다.
+    ///
+    /// SByte~UInt32는 Jastech OPC UA 설정 파일(OpcuaNodeVariableType: BIT/SBYTE/BYTE/INT16/
+    /// UINT16/INT32/UINT32/FLOAT/DOUBLE/STRING)에 나오는 타입까지 그대로 받기 위해 추가했다.
+    /// </summary>
     public enum PlcDataType
     {
         Bool,
@@ -19,6 +27,10 @@ namespace VirtualPlcServer.Core
         Int32,
         Float,
         Double,
-        String
+        String,
+        SByte,
+        Byte,
+        UInt16,
+        UInt32
     }
 }

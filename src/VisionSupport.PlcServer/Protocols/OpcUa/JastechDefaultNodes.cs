@@ -21,9 +21,11 @@ namespace VirtualPlcServer.Protocols.OpcUa
     /// </summary>
     public static class JastechDefaultNodes
     {
-        private const int TimeSyncArrayLength = 6;      // 추정값 (예: 년/월/일/시/분/초)
-        private const int AlignArrayLength = 3;          // 추정값 (예: X/Y/Theta)
-        private const int ServoPositionArrayLength = 3;  // 추정값 (예: X/Y/Z)
+        // internal인 이유: JastechCfgFile이 설정 파일을 읽을 때 같은 추정값을 배열 길이 기본값으로
+        // 재사용한다(그 파일 포맷에도 배열 길이가 없다 - 위 주석 참고).
+        internal const int TimeSyncArrayLength = 6;      // 추정값 (예: 년/월/일/시/분/초)
+        internal const int AlignArrayLength = 3;          // 추정값 (예: X/Y/Theta)
+        internal const int ServoPositionArrayLength = 3;  // 추정값 (예: X/Y/Z)
 
         /// <param name="pcId">0-based PC 번호. VPC{pcId+1}로 변환된다 (기본값 0 -> VPC1).</param>
         /// <param name="unitCount">AutoRun2DCount에 해당하는 유닛 개수. 기본값 1 (실제 COG 앱의 기본 설정값).</param>
