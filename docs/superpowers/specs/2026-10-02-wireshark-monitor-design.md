@@ -35,7 +35,8 @@ GenTL 프로듀서(`C:\Program Files\Matrox Imaging\Drivers\GenTLProducer\Win64\
 새 프로젝트 `src/VisionSupport.Wireshark` (net9.0-windows, x64, WPF, 네임스페이스
 `VisionSupport.Wireshark`). 셸 → 기능 단방향 참조 규칙 그대로.
 
-- `WiresharkFeature : FeatureModule` — `App.CreateTools()`에 한 줄 등록. 타이틀 "통신 모니터",
+- `WiresharkFeature : FeatureModule` — 다른 기능과 같이 셸의 `src/VisionSupport/Features/`에 둔다
+  (`FeatureModule`이 셸에 있고 참조는 셸 → 기능 한 방향뿐이므로). `App.CreateTools()`에 한 줄 등록. 타이틀 "통신 모니터",
   Glyph는 `LanConnect` 계열(LauncherIconTests로 검증).
 - 패키지: `Microsoft.Diagnostics.Tracing.TraceEvent`, `ScottPlot.WPF`, `CommunityToolkit.Mvvm`
   (메모리 모니터와 같은 버전).
@@ -140,8 +141,8 @@ LinkWatcher ──┘
 
 - 패킷 원본은 원형 버퍼, 기본 **200MB 또는 50만 개** 중 먼저 닿는 쪽(설정 가능).
 - 이상 이벤트마다 **앞 20개·뒤 20개** 패킷은 별도 보존(이벤트 최대 1000개, 넘으면 오래된 것부터).
-- GVSP 영상 페이로드는 저장하지 않는다 — 헤더(블록 ID·패킷 ID·포맷)만 판정에 쓰고 패킷 목록에는
-  초당 집계 행으로만 보인다.
+- GVSP 영상 페이로드 패킷은 저장하지 않는다 — 헤더(블록 ID·패킷 ID·포맷)만 판정에 쓰고, 패킷
+  목록에는 리더/트레일러(프레임당 2개)와 이상이 걸린 페이로드 패킷만 남긴다.
 - 차트는 최근 10분만 유지.
 
 ## 9. 오류 처리
@@ -162,6 +163,8 @@ LinkWatcher ──┘
    `Matrox.CoaXPress.cti`의 TL/Interface를 열고 링크 상태·에러 카운터 노드를 읽을 수 있는가,
    Device를 `DEVICE_ACCESS_READONLY`로 열 수 있는가. **장비 PC에서 확인**.
    실패 시 9절의 강등 모드가 기본 동작이 된다.
+   어느 경우든 이 도구는 **폴링 사이에 GenTL 핸들을 쥐고 있지 않는다**(매 폴링마다 열고 읽고 닫음) —
+   이 도구가 먼저 떠 있어도 나중에 켜지는 VISION의 장치 열기를 막지 않기 위해서다.
 
 결과는 이 문서의 이 절에 기록한다.
 
