@@ -44,7 +44,7 @@ public static class GigEDissector
 
         packet.Protocol = "GVCP";
         packet.Info = message.Summary;
-        packet.App = message;
+        packet.AddMessage(message);
         return true;
     }
 

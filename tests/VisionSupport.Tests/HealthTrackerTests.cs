@@ -201,6 +201,19 @@ public class HealthTrackerTests
         Assert.Equal(HealthLevel.Ok, _tracker.Snapshot().Single(t => t.Id == ads).Level);
     }
 
+    [Fact]
+    public void Answers_coalesced_into_one_segment_all_count()
+    {
+        Send(TestFrames.Tcp("192.168.0.2", 50000, "192.168.0.20", 48898, TestFrames.Ads(2, false, 7)));
+        Send(TestFrames.Tcp("192.168.0.2", 50000, "192.168.0.20", 48898, TestFrames.Ads(2, false, 8)));
+        Send(TestFrames.Tcp("192.168.0.20", 48898, "192.168.0.2", 50000,
+            TestFrames.Ads(2, true, 7).Concat(TestFrames.Ads(2, true, 8)).ToArray()));
+        _clock.Advance(1.5);
+        _tracker.Tick();
+
+        Assert.DoesNotContain(_tracker.DrainAnomalies(), a => a.Kind == AnomalyKind.Timeout);
+    }
+
     /// <summary>A reset connection will never answer what it was asked; that is the RST, not a timeout.</summary>
     [Fact]
     public void A_reset_connection_does_not_also_time_out_its_requests()

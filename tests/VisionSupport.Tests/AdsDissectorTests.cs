@@ -40,4 +40,24 @@ public class AdsDissectorTests
     [Fact]
     public void A_truncated_ams_header_stays_plain_tcp()
         => Assert.Null(Ads(TestFrames.Ads(2, false, 1).AsSpan(0, 20).ToArray(), toPlc: true).App);
+
+    /// <summary>A large Read answer spans several segments; a zero-filled continuation is data, not a request.</summary>
+    [Fact]
+    public void A_zero_filled_continuation_segment_is_not_an_ams_header()
+        => Assert.Null(Ads(new byte[100], toPlc: false).App);
+
+    [Fact]
+    public void Every_answer_coalesced_into_one_segment_is_read()
+    {
+        byte[] both = TestFrames.Ads(2, response: true, invokeId: 7).Concat(TestFrames.Ads(2, response: true, invokeId: 8)).ToArray();
+
+        Packet p = Ads(both, toPlc: false);
+
+        Assert.Equal(new uint?[] { 7, 8 }, p.Messages.Select(m => m.CorrelationId));
+        Assert.Equal("ADS Read 응답 #7 외 1건", p.Info);
+    }
+
+    [Fact]
+    public void A_request_header_travelling_from_the_plc_is_not_a_request()
+        => Assert.Null(Ads(TestFrames.Ads(2, response: false, invokeId: 7), toPlc: false).App);
 }

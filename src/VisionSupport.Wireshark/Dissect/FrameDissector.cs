@@ -157,11 +157,11 @@ public static class FrameDissector
         ReadOnlySpan<byte> payload = f.AsSpan(payloadAt);
         if (context.IsMcPort(dp) || context.IsMcPort(sp))
         {
-            McDissector.TryDissect(payload, payloadAt, packet);
+            McDissector.TryDissect(payload, payloadAt, packet, toServer: context.IsMcPort(dp));
         }
         else if (dp == context.AdsPort || sp == context.AdsPort)
         {
-            AdsDissector.TryDissect(payload, payloadAt, packet);
+            AdsDissector.TryDissect(payload, payloadAt, packet, toServer: dp == context.AdsPort);
         }
     }
 

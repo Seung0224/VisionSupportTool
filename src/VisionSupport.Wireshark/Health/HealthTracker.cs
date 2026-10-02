@@ -99,14 +99,17 @@ public sealed partial class HealthTracker
             target.Bytes += packet.OriginalLength;
             target.SilenceReported = false;
 
-            if (packet.App is { Kind: AppKind.Mc or AppKind.Ads } app)
+            foreach (AppMessage message in packet.Messages)
             {
-                TrackMessage(target, packet, app);
-            }
-            else if (packet.App is { IsError: true } other)
-            {
-                packet.IsAnomalous = true;
-                Raise(target, AnomalyKind.ErrorResponse, HealthLevel.Warn, other.Summary, packet.Number);
+                if (message.Kind is AppKind.Mc or AppKind.Ads)
+                {
+                    TrackMessage(target, packet, message);
+                }
+                else if (message.IsError)
+                {
+                    packet.IsAnomalous = true;
+                    Raise(target, AnomalyKind.ErrorResponse, HealthLevel.Warn, message.Summary, packet.Number);
+                }
             }
 
             ObserveTransportCore(target, packet);

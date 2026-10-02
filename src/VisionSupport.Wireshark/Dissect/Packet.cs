@@ -61,7 +61,17 @@ public sealed class Packet
 
     public UdpInfo? Udp { get; set; }
 
+    /// <summary>The first application message in this frame; see <see cref="Messages"/> for all of them.</summary>
     public AppMessage? App { get; set; }
+
+    /// <summary>Every application message in the frame - a PLC may answer several requests in one segment.</summary>
+    public List<AppMessage> Messages { get; } = new();
+
+    public void AddMessage(AppMessage message)
+    {
+        App ??= message;
+        Messages.Add(message);
+    }
 
     public GvspHeader? Gvsp { get; set; }
 

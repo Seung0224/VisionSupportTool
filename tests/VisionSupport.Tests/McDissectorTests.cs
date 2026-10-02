@@ -58,4 +58,16 @@ public class McDissectorTests
     public void Mc_bytes_on_a_port_outside_the_range_are_not_read_as_mc()
         => Assert.Null(TestFrames.Dissect(
             TestFrames.Tcp("192.168.0.2", 50000, "192.168.0.10", 8080, TestFrames.McReadRequest3E)).App);
+
+    [Fact]
+    public void A_request_header_travelling_from_the_plc_is_not_a_request()
+        => Assert.Null(Over5000(TestFrames.McReadRequest3E, toPlc: false).App);
+
+    [Fact]
+    public void Back_to_back_frames_in_one_segment_are_all_read()
+    {
+        Packet p = Over5000(TestFrames.McOkResponse3E.Concat(TestFrames.McOkResponse3E).ToArray(), toPlc: false);
+
+        Assert.Equal(2, p.Messages.Count);
+    }
 }

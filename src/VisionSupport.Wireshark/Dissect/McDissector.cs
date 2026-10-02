@@ -5,11 +5,31 @@ namespace VisionSupport.Wireshark.Dissect;
 /// <summary>
 /// MELSEC MC protocol, 3E and 4E binary frames. Only the header is read: who asked what, and
 /// whether the answer's end code was zero. Device addresses and data stay in the hex view.
+/// Requests must travel to the PLC's port and answers from it, and every frame in a segment is
+/// read - a PLC that answers back to back may put several in one.
 /// </summary>
 public static class McDissector
 {
-    public static bool TryDissect(ReadOnlySpan<byte> p, int offset, Packet packet)
+    public static bool TryDissect(ReadOnlySpan<byte> p, int offset, Packet packet, bool toServer)
     {
+        int at = 0;
+        while (TryReadOne(p[at..], offset + at, packet, toServer, out int length))
+        {
+            at += length;
+            if (at >= p.Length) break;
+        }
+        if (packet.Messages.Count == 0) return false;
+
+        packet.Protocol = "MC";
+        packet.Info = packet.Messages.Count == 1
+            ? packet.Messages[0].Summary
+            : $"{packet.Messages[0].Summary} 외 {packet.Messages.Count - 1}건";
+        return true;
+    }
+
+    private static bool TryReadOne(ReadOnlySpan<byte> p, int offset, Packet packet, bool toServer, out int length)
+    {
+        length = 0;
         if (p.Length < 2) return false;
 
         bool is4E, request;
@@ -22,10 +42,14 @@ public static class McDissector
             default: return false;
         }
 
+        if (request != toServer) return false;
+
         // b is where the access route (network no.) starts.
         int b = is4E ? 6 : 2;
         int needed = request ? b + 11 : b + 9;
         if (p.Length < needed) return false;
+        // The data length counts everything after itself.
+        length = b + 7 + BinaryPrimitives.ReadUInt16LittleEndian(p[(b + 5)..]);
 
         string frame = is4E ? "4E" : "3E";
         uint? serial = is4E ? BinaryPrimitives.ReadUInt16LittleEndian(p[2..]) : null;
@@ -58,10 +82,8 @@ public static class McDissector
         }
 
         packet.Layers.Add(node);
-        packet.Protocol = "MC";
-        packet.Info = summary;
-        packet.App = new AppMessage(AppKind.Mc, request ? MessageRole.Request : MessageRole.Response,
-            serial, summary, isError);
+        packet.AddMessage(new AppMessage(AppKind.Mc, request ? MessageRole.Request : MessageRole.Response,
+            serial, summary, isError));
         return true;
     }
 
