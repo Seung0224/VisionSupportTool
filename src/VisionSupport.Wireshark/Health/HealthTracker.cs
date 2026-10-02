@@ -266,6 +266,19 @@ public sealed partial class HealthTracker
             p.Reported = true;
             Raise(t, AnomalyKind.Timeout, HealthLevel.Bad, $"응답 없음 (요청 #{p.Packet})", p.Packet);
         }
+
+        // An answer this late is not coming. Let it go so the card can recover; the timeout
+        // stays in the anomaly list.
+        TimeSpan giveUp = TimeSpan.FromMilliseconds(_t.ResponseTimeoutMs) + TimeSpan.FromSeconds(_t.RecoverySeconds);
+        foreach (string key in t.Correlated.Where(kv => kv.Value.Reported && now - kv.Value.Sent > giveUp)
+                     .Select(kv => kv.Key).ToList())
+        {
+            t.Correlated.Remove(key);
+        }
+        foreach (Queue<Pending> queue in t.Fifo.Values)
+        {
+            while (queue.Count > 0 && queue.Peek().Reported && now - queue.Peek().Sent > giveUp) queue.Dequeue();
+        }
     }
 
     private void CheckSilence(TargetState t, DateTime now)
@@ -387,6 +400,16 @@ public sealed partial class HealthTracker
                 Fifo.Add(client, queue);
             }
             return queue;
+        }
+
+        /// <summary>A connection that was reset or closed will never answer what it was asked.</summary>
+        public void ForgetClient(string client)
+        {
+            foreach (string key in Correlated.Keys.Where(k => k.StartsWith(client + "#", StringComparison.Ordinal)).ToList())
+            {
+                Correlated.Remove(key);
+            }
+            Fifo.Remove(client);
         }
 
         public IEnumerable<Pending> AllPending() => Correlated.Values.Concat(Fifo.Values.SelectMany(q => q));

@@ -107,6 +107,7 @@ public sealed partial class HealthTracker
         if ((verdict & (TcpVerdict.Reset | TcpVerdict.Fin)) != 0)
         {
             packet.IsAnomalous = true;
+            target.ForgetClient(packet.Source == target.Id ? packet.Destination : packet.Source);
             Raise(target, AnomalyKind.ConnectionClosed, HealthLevel.Bad,
                 verdict.HasFlag(TcpVerdict.Reset) ? "연결 리셋(RST)" : "연결 종료(FIN)", packet.Number);
         }

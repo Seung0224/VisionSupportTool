@@ -185,6 +185,34 @@ public class HealthTrackerTests
         Assert.True(_tracker.HasAlert);
     }
 
+    /// <summary>One answer lost for good must not keep the card red for the rest of the day.</summary>
+    [Fact]
+    public void A_never_answered_request_is_let_go_after_the_recovery_window()
+    {
+        const string ads = "192.168.0.20:48898";
+        Send(TestFrames.Tcp("192.168.0.2", 50000, "192.168.0.20", 48898, TestFrames.Ads(2, false, 7)));
+        _clock.Advance(1.5);
+        _tracker.Tick();
+        _clock.Advance(31);
+        Send(TestFrames.Tcp("192.168.0.2", 50000, "192.168.0.20", 48898, TestFrames.Ads(2, false, 8)));
+        Send(TestFrames.Tcp("192.168.0.20", 48898, "192.168.0.2", 50000, TestFrames.Ads(2, true, 8)));
+        _tracker.Tick();
+
+        Assert.Equal(HealthLevel.Ok, _tracker.Snapshot().Single(t => t.Id == ads).Level);
+    }
+
+    /// <summary>A reset connection will never answer what it was asked; that is the RST, not a timeout.</summary>
+    [Fact]
+    public void A_reset_connection_does_not_also_time_out_its_requests()
+    {
+        Request();
+        Send(TestFrames.Tcp("192.168.0.10", 5000, "192.168.0.2", 50000, flags: TcpFlags.Rst | TcpFlags.Ack));
+        _clock.Advance(1.5);
+        _tracker.Tick();
+
+        Assert.DoesNotContain(_tracker.DrainAnomalies(), a => a.Kind == AnomalyKind.Timeout);
+    }
+
     /// <summary>Stopping the capture is not the PLC going quiet.</summary>
     [Fact]
     public void After_capture_stops_targets_read_capture_off_instead_of_cut_off()
