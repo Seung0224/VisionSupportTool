@@ -8,6 +8,7 @@ public sealed partial class HealthTracker
     private readonly TcpAnalyzer _tcp = new();
     private readonly GvspAnalyzer _gvsp = new();
     private readonly Dictionary<string, Dictionary<int, CxpConnectionStatus>> _cxpPrevious = new();
+    private readonly List<PendingDrop> _pendingDrops = new();
     private long _captureLostTotal;
     private DateTime? _lastCaptureLoss;
 
@@ -120,17 +121,38 @@ public sealed partial class HealthTracker
             int lost = _gvsp.Inspect(target.Id, gvsp);
             if (lost == 0) return;
 
+            // Judged on the next tick, not here: the ETW lost-event count that could explain this
+            // gap is only read once a second, usually after the gap has already been seen.
             packet.IsAnomalous = true;
-            bool uncertain = _lastCaptureLoss is { } loss && (Now - loss).TotalSeconds < 10;
-            if (uncertain)
+            _pendingDrops.Add(new PendingDrop(target, lost, packet.Time, packet.Number));
+        }
+    }
+
+    /// <summary>
+    /// Settles drops seen since the last tick. A capture loss from 10 s before the gap up to now
+    /// makes it a yellow suspicion; otherwise, once a tick has had the chance to report a loss
+    /// (2 s), it is a red drop.
+    /// </summary>
+    private void SettleDrops(DateTime now)
+    {
+        for (int i = _pendingDrops.Count - 1; i >= 0; i--)
+        {
+            PendingDrop d = _pendingDrops[i];
+            bool explained = _lastCaptureLoss is { } loss && loss >= d.Seen.AddSeconds(-10);
+            if (!explained && (now - d.Seen).TotalSeconds < 2) continue;
+
+            _pendingDrops.RemoveAt(i);
+            if (explained)
             {
-                Raise(target, AnomalyKind.FrameDrop, HealthLevel.Warn, $"프레임 드롭 의심 {lost}장 (캡처 누락 동반)", packet.Number);
+                Raise(d.Target, AnomalyKind.FrameDrop, HealthLevel.Warn, $"프레임 드롭 의심 {d.Lost}장 (캡처 누락 동반)", d.Packet);
             }
             else
             {
-                target.DropCount += lost;
-                Raise(target, AnomalyKind.FrameDrop, HealthLevel.Bad, $"프레임 드롭 {lost}장 (누적 {target.DropCount})", packet.Number);
+                d.Target.DropCount += d.Lost;
+                Raise(d.Target, AnomalyKind.FrameDrop, HealthLevel.Bad, $"프레임 드롭 {d.Lost}장 (누적 {d.Target.DropCount})", d.Packet);
             }
         }
     }
+
+    private sealed record PendingDrop(TargetState Target, int Lost, DateTime Seen, long Packet);
 }

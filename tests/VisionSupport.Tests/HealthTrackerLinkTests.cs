@@ -86,6 +86,7 @@ public class HealthTrackerLinkTests
         LearnCamera();
         Frame(1, 1, 2, 3);
         Frame(3, 1, 2, 3);
+        _clock.Advance(2);
         _tracker.Tick();
 
         TargetSnapshot cam = Target(TestFrames.Camera);
@@ -103,6 +104,8 @@ public class HealthTrackerLinkTests
         Send(TestFrames.Gvsp(1, 3, GvspFormat.Payload));
         Send(TestFrames.Gvsp(1, 5, GvspFormat.Payload));
         Send(TestFrames.Gvsp(1, 6, GvspFormat.Trailer));
+        _clock.Advance(2);
+        _tracker.Tick();
 
         Assert.Equal(1, Target(TestFrames.Camera).DropCount);
     }
@@ -133,6 +136,25 @@ public class HealthTrackerLinkTests
         Assert.Equal(HealthLevel.Warn, drop.Severity);
         Assert.Equal("프레임 드롭 의심 1장 (캡처 누락 동반)", drop.Text);
         Assert.Equal(HealthLevel.Warn, Target(TestFrames.Camera).Level);
+    }
+
+    /// <summary>
+    /// The real order on a live line: the gap shows up on the capture thread first, and the ETW
+    /// lost-event count is only read on the next one-second tick. That loss still explains the gap.
+    /// </summary>
+    [Fact]
+    public void A_capture_loss_reported_just_after_the_gap_still_makes_it_a_suspicion()
+    {
+        LearnCamera();
+        Frame(1, 1);
+        Frame(3, 1);
+        _clock.Advance(0.8);
+        _tracker.ReportCaptureLoss(10);
+        _tracker.Tick();
+
+        Anomaly drop = Assert.Single(_tracker.DrainAnomalies(), a => a.Kind == AnomalyKind.FrameDrop);
+        Assert.Equal(HealthLevel.Warn, drop.Severity);
+        Assert.Equal(0, Target(TestFrames.Camera).DropCount);
     }
 
     [Fact]

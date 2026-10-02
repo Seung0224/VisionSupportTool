@@ -93,6 +93,7 @@ public sealed partial class HealthTracker
         lock (_gate)
         {
             DateTime now = Now;
+            SettleDrops(now);
             foreach (TargetState t in _targets.Values)
             {
                 CheckTimeouts(t, now);
