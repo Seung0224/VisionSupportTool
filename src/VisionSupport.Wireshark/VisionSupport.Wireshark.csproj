@@ -13,6 +13,11 @@
     <RootNamespace>VisionSupport.Wireshark</RootNamespace>
   </PropertyGroup>
 
+  <!-- Pure helpers (pktmon output parsing, dedupe) are tested without growing the public surface. -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="VisionSupport.Tests" />
+  </ItemGroup>
+
   <ItemGroup>
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
     <!-- pktmon's packets arrive as ETW events; same package and version as the memory monitor. -->
