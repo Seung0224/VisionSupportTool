@@ -1,6 +1,6 @@
 namespace VisionSupport.Wireshark.ViewModels;
 
-/// <summary>One target's last ten minutes at one sample a second: bytes/s and response time.</summary>
+/// <summary>One target's history at one sample a second: bytes/s and response time.</summary>
 public sealed class ChartHistory
 {
     private readonly int _capacity;
@@ -9,12 +9,17 @@ public sealed class ChartHistory
 
     public List<DateTime> Times { get; } = new();
 
+    /// <summary>When the first sample was taken. Chart X is seconds from here, and it never moves,
+    /// so trimming old samples does not slide a window the user has panned to.</summary>
+    public DateTime Start { get; private set; }
+
     public List<double> BytesPerSecond { get; } = new();
 
     public List<double> ResponseMs { get; } = new();
 
     public void Add(DateTime time, double bytes, double? responseMs)
     {
+        if (Times.Count == 0 && Start == default) Start = time;
         Times.Add(time);
         BytesPerSecond.Add(bytes);
         // A second with no answer keeps the last response time rather than dropping to zero.
@@ -24,4 +29,6 @@ public sealed class ChartHistory
         BytesPerSecond.RemoveAt(0);
         ResponseMs.RemoveAt(0);
     }
+
+    public double[] Seconds() => Times.Select(t => (t - Start).TotalSeconds).ToArray();
 }

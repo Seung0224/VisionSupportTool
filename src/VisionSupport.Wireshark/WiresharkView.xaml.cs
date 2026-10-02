@@ -18,12 +18,23 @@ public partial class WiresharkView : UserControl, IDisposable
     /// default -10..10 s axis, and MinValue minus ten seconds throws.</summary>
     private DateTime _timeOrigin = DateTime.Now;
 
+    // Chart window, same model as the memory monitor: a width, and either following the newest
+    // sample or parked where the scrollbar left it (seconds since the history's Start).
+    private double _viewSpanSeconds = 600;
+    private bool _followLive = true;
+    private double _viewLeftEdge;
+    private bool _syncingScroll;
+    private ChartHistory? _shownHistory;
+
     public WiresharkView(WiresharkViewModel viewModel)
     {
         InitializeComponent();
         _viewModel = viewModel;
         DataContext = viewModel;
         StyleChart();
+        UpdateSpanLabel();
+        Chart.MouseMove += OnChartMouseMove;
+        Chart.MouseLeave += (_, _) => HideReadout();
         viewModel.ChartUpdated += OnChartUpdated;
         Loaded += (_, _) =>
         {
@@ -105,28 +116,163 @@ public partial class WiresharkView : UserControl, IDisposable
         Chart.Refresh();
     }
 
-    private void OnChartUpdated(object? sender, EventArgs e)
+    private void OnChartUpdated(object? sender, EventArgs e) => RedrawChart();
+
+    private void RedrawChart()
     {
         ChartHistory? history = _viewModel.FocusedHistory;
-        ChartHint.Visibility = history is { Times.Count: > 1 } ? Visibility.Collapsed : Visibility.Visible;
-        if (history is not { Times.Count: > 1 }) return;
+        if (!ReferenceEquals(history, _shownHistory))
+        {
+            // Another card: start from its newest data.
+            _shownHistory = history;
+            _followLive = true;
+            HideReadout();
+        }
+
+        bool hasData = history is { Times.Count: > 1 };
+        ChartHint.Visibility = hasData ? Visibility.Collapsed : Visibility.Visible;
+        if (!hasData) return;
+
+        _timeOrigin = history!.Start;
+        double[] seconds = history.Seconds();
+        double bufferStart = seconds[0];
+        double latest = seconds[^1];
+        (double viewStart, double viewEnd) = ChartTimeWindow.View(
+            bufferStart, latest, _viewSpanSeconds, _followLive, _viewLeftEdge);
+        SyncTimeScroll(bufferStart, latest, viewStart);
+
+        // Only the samples inside the window (plus one either side), as the memory monitor does:
+        // twelve hours at 1 Hz is too many points to redraw every second.
+        int first = FirstIndexAtOrAfter(seconds, viewStart);
+        if (first > 0) first--;
+        int end = FirstIndexAtOrAfter(seconds, viewEnd);
+        if (end < seconds.Length) end++;
+        int count = end - first;
+
+        double[] xs = seconds.AsSpan(first, count).ToArray();
+        double[] bytes = history.BytesPerSecond.GetRange(first, count).ToArray();
+        double[] response = history.ResponseMs.GetRange(first, count).ToArray();
 
         Plot plot = Chart.Plot;
         plot.Clear();
-        _timeOrigin = history.Times[0];
-        double[] xs = history.Times.Select(t => (t - _timeOrigin).TotalSeconds).ToArray();
-
-        var traffic = plot.Add.Scatter(xs, history.BytesPerSecond.ToArray());
+        var traffic = plot.Add.Scatter(xs, bytes);
         traffic.MarkerSize = 0;
+        traffic.LineWidth = 2;
         traffic.Color = PlotColor.FromHex("#1F9CF0");
+        var answer = plot.Add.Scatter(xs, response);
+        answer.MarkerSize = 0;
+        answer.LineWidth = 2;
+        answer.Color = PlotColor.FromHex("#DCDCAA");
+        answer.Axes.YAxis = plot.Axes.Right;
 
-        var response = plot.Add.Scatter(xs, history.ResponseMs.ToArray());
-        response.MarkerSize = 0;
-        response.Color = PlotColor.FromHex("#DCDCAA");
-        response.Axes.YAxis = plot.Axes.Right;
-
-        plot.Axes.AutoScale();
+        plot.Axes.AutoScale();                     // Y fits the visible points...
+        plot.Axes.SetLimitsX(viewStart, viewEnd);  // ...then X is pinned to the time window
         Chart.Refresh();
+    }
+
+    private static int FirstIndexAtOrAfter(double[] seconds, double value)
+    {
+        int lo = 0, hi = seconds.Length;
+        while (lo < hi)
+        {
+            int mid = (lo + hi) / 2;
+            if (seconds[mid] < value) lo = mid + 1;
+            else hi = mid;
+        }
+        return lo;
+    }
+
+    /// <summary>Pushes the window position into the scrollbar without tripping its Scroll event
+    /// (meant for user drags only), and refreshes the range label.</summary>
+    private void SyncTimeScroll(double bufferStart, double latest, double viewStart)
+    {
+        (double min, double max, double viewport) = ChartTimeWindow.Scrollbar(bufferStart, latest, _viewSpanSeconds);
+        _syncingScroll = true;
+        try
+        {
+            TimeScroll.Minimum = min;
+            TimeScroll.Maximum = max;
+            TimeScroll.ViewportSize = viewport;
+            TimeScroll.LargeChange = viewport;
+            TimeScroll.SmallChange = viewport / 10;
+            TimeScroll.Value = _followLive ? max : Math.Clamp(viewStart, min, max);
+            TimeScroll.IsEnabled = max > min;
+        }
+        finally
+        {
+            _syncingScroll = false;
+        }
+
+        TimeRangeLabel.Text = _followLive
+            ? $"실시간 · 최근 {_viewSpanSeconds / 60:0}분"
+            : $"{_timeOrigin.AddSeconds(viewStart):HH:mm:ss} ~ {_timeOrigin.AddSeconds(viewStart + _viewSpanSeconds):HH:mm:ss}";
+    }
+
+    private void OnTimeScroll(object sender, System.Windows.Controls.Primitives.ScrollEventArgs e)
+    {
+        if (_syncingScroll) return;
+        _followLive = ChartTimeWindow.AtLiveEdge(e.NewValue, TimeScroll.Maximum);
+        _viewLeftEdge = e.NewValue;
+        RedrawChart();
+    }
+
+    private void OnZoomPreset(object sender, RoutedEventArgs e)
+    {
+        _viewSpanSeconds = double.Parse((string)((Button)sender).Tag, System.Globalization.CultureInfo.InvariantCulture);
+        _followLive = true;
+        UpdateSpanLabel();
+        RedrawChart();
+    }
+
+    private void OnFollowLive(object sender, RoutedEventArgs e)
+    {
+        _followLive = true;
+        RedrawChart();
+    }
+
+    private void UpdateSpanLabel() => SpanLabel.Text = $"표시 {_viewSpanSeconds / 60:0}분";
+
+    /// <summary>Crosshair snapped to the nearest sample, with that second's numbers beside it.</summary>
+    private void OnChartMouseMove(object sender, MouseEventArgs e)
+    {
+        ChartHistory? history = _shownHistory;
+        if (history is not { Times.Count: > 1 })
+        {
+            HideReadout();
+            return;
+        }
+
+        Pixel mouse = Chart.GetPlotPixelPosition(e);
+        double hovered = Chart.Plot.GetCoordinates(mouse).X;
+        double[] seconds = history.Seconds();
+        int i = Math.Clamp(FirstIndexAtOrAfter(seconds, hovered), 0, seconds.Length - 1);
+        if (i > 0 && hovered - seconds[i - 1] < seconds[i] - hovered) i--;
+
+        ReadoutTime.Text = $"{history.Times[i]:HH:mm:ss}";
+        ReadoutBytes.Text = $"{history.BytesPerSecond[i]:N0} B/s";
+        ReadoutResponse.Text = $"{history.ResponseMs[i]:0} ms";
+
+        double scale = Chart.DisplayScale <= 0 ? 1 : Chart.DisplayScale;
+        double x = Chart.Plot.GetPixel(new Coordinates(seconds[i], 0)).X / scale;
+        Crosshair.X1 = Crosshair.X2 = x;
+        Crosshair.Y1 = 0;
+        Crosshair.Y2 = Overlay.ActualHeight;
+        Crosshair.Visibility = Visibility.Visible;
+
+        Readout.Visibility = Visibility.Visible;
+        Readout.UpdateLayout();
+        Point cursor = e.GetPosition(Overlay);
+        double left = x + 14;
+        if (left + Readout.ActualWidth > Overlay.ActualWidth) left = x - Readout.ActualWidth - 14;
+        double top = Math.Clamp(cursor.Y - Readout.ActualHeight / 2, 4, Math.Max(4, Overlay.ActualHeight - Readout.ActualHeight - 4));
+        Canvas.SetLeft(Readout, Math.Max(4, left));
+        Canvas.SetTop(Readout, top);
+    }
+
+    private void HideReadout()
+    {
+        Crosshair.Visibility = Visibility.Collapsed;
+        Readout.Visibility = Visibility.Collapsed;
     }
 
     private static T? FindAncestor<T>(DependencyObject node) where T : DependencyObject

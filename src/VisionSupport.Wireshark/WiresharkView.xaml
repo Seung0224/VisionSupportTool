@@ -20,6 +20,74 @@
         <local:InverseBoolConverter x:Key="Not"/>
         <local:ZeroToVisibilityConverter x:Key="ZeroToVis"/>
 
+        <!-- Time scrollbar, copied from the memory monitor so both charts pan the same way. -->
+        <Style x:Key="TimeScrollPageButton" TargetType="RepeatButton">
+            <Setter Property="OverridesDefaultStyle" Value="True"/>
+            <Setter Property="Focusable" Value="False"/>
+            <Setter Property="IsTabStop" Value="False"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RepeatButton">
+                        <Border Background="Transparent"/>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="TimeScrollThumb" TargetType="Thumb">
+            <Setter Property="OverridesDefaultStyle" Value="True"/>
+            <Setter Property="MinWidth" Value="28"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Thumb">
+                        <Border x:Name="Chrome" Background="#FF5A5A5A" CornerRadius="3" Margin="0,2"/>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Chrome" Property="Background" Value="#FF7A7A7A"/>
+                            </Trigger>
+                            <Trigger Property="IsDragging" Value="True">
+                                <Setter TargetName="Chrome" Property="Background" Value="#FF8A8A8A"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="TimeScrollBarStyle" TargetType="ScrollBar">
+            <Setter Property="OverridesDefaultStyle" Value="True"/>
+            <Setter Property="Height" Value="14"/>
+            <Setter Property="Focusable" Value="False"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ScrollBar">
+                        <Border Background="{StaticResource Panel}" BorderBrush="{StaticResource Border}"
+                                BorderThickness="1" CornerRadius="3">
+                            <Track x:Name="PART_Track" Orientation="Horizontal" IsDirectionReversed="False"
+                                   ViewportSize="{TemplateBinding ViewportSize}">
+                                <Track.DecreaseRepeatButton>
+                                    <RepeatButton Style="{StaticResource TimeScrollPageButton}"
+                                                  Command="ScrollBar.PageLeftCommand"/>
+                                </Track.DecreaseRepeatButton>
+                                <Track.IncreaseRepeatButton>
+                                    <RepeatButton Style="{StaticResource TimeScrollPageButton}"
+                                                  Command="ScrollBar.PageRightCommand"/>
+                                </Track.IncreaseRepeatButton>
+                                <Track.Thumb>
+                                    <Thumb Style="{StaticResource TimeScrollThumb}"/>
+                                </Track.Thumb>
+                            </Track>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.4"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <Style x:Key="Separator" TargetType="Rectangle">
             <Setter Property="Width" Value="1"/>
             <Setter Property="Fill" Value="{StaticResource Border}"/>
@@ -153,11 +221,85 @@
             </DockPanel>
         </Border>
 
-        <!-- chart for the focused card -->
+        <!-- chart for the focused card: presets set the window width, the scrollbar pans it
+             across the retained 12 h, and dragged fully right it follows live again -->
         <Grid Grid.Row="2">
-            <sp:WpfPlot x:Name="Chart"/>
-            <TextBlock x:Name="ChartHint" Text="카드를 누르면 그 대상의 송수신량(파랑)과 응답 시간(노랑)이 여기 그려집니다."
-                       Foreground="{StaticResource FgDim}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+            <Grid Grid.Row="0">
+                <sp:WpfPlot x:Name="Chart"/>
+                <Canvas x:Name="Overlay" IsHitTestVisible="False" ClipToBounds="True">
+                    <Line x:Name="Crosshair" Stroke="#FF8A8A8A" StrokeThickness="1"
+                          StrokeDashArray="3 3" Visibility="Collapsed"/>
+                    <Border x:Name="Readout" Background="#F21E1E1E" BorderBrush="{StaticResource Border}"
+                            BorderThickness="1" CornerRadius="4" Padding="10,8" Visibility="Collapsed">
+                        <StackPanel>
+                            <TextBlock x:Name="ReadoutTime" Foreground="{StaticResource Fg}" FontWeight="SemiBold"
+                                       Margin="0,0,0,6"/>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="72"/>
+                                    <ColumnDefinition Width="90"/>
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition/>
+                                    <RowDefinition/>
+                                </Grid.RowDefinitions>
+                                <Rectangle Width="9" Height="9" RadiusX="2" RadiusY="2" Fill="#FF1F9CF0" Margin="0,0,8,3"/>
+                                <TextBlock Grid.Column="1" Text="송수신" Foreground="{StaticResource FgDim}"/>
+                                <TextBlock Grid.Column="2" x:Name="ReadoutBytes" Foreground="{StaticResource Fg}"
+                                           FontFamily="Consolas" HorizontalAlignment="Right"/>
+                                <Rectangle Grid.Row="1" Width="9" Height="9" RadiusX="2" RadiusY="2" Fill="#FFDCDCAA" Margin="0,0,8,3"/>
+                                <TextBlock Grid.Row="1" Grid.Column="1" Text="응답" Foreground="{StaticResource FgDim}"/>
+                                <TextBlock Grid.Row="1" Grid.Column="2" x:Name="ReadoutResponse" Foreground="{StaticResource Fg}"
+                                           FontFamily="Consolas" HorizontalAlignment="Right"/>
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+                </Canvas>
+                <TextBlock x:Name="ChartHint" Text="카드를 누르면 그 대상의 송수신량(파랑)과 응답 시간(노랑)이 여기 그려집니다."
+                           Foreground="{StaticResource FgDim}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                <!-- Window-width presets; each also snaps the view back to live. -->
+                <Border HorizontalAlignment="Left" VerticalAlignment="Top"
+                        Margin="70,8,0,0" Padding="4,3" CornerRadius="4" Background="#D9252526"
+                        BorderBrush="{StaticResource Border}" BorderThickness="1">
+                    <StackPanel Orientation="Horizontal">
+                        <StackPanel.Resources>
+                            <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                                <Setter Property="Padding" Value="7,2"/>
+                                <Setter Property="Margin" Value="2,0"/>
+                                <Setter Property="MinWidth" Value="0"/>
+                                <Setter Property="FontSize" Value="11"/>
+                            </Style>
+                        </StackPanel.Resources>
+                        <Button Content="5분" Tag="300" Click="OnZoomPreset"/>
+                        <Button Content="10분" Tag="600" Click="OnZoomPreset"/>
+                        <Button Content="30분" Tag="1800" Click="OnZoomPreset"/>
+                        <Button Content="1시간" Tag="3600" Click="OnZoomPreset"/>
+                        <Button Content="최신" Click="OnFollowLive" ToolTip="최신 데이터로 돌아가 실시간으로 따라갑니다."/>
+                        <TextBlock x:Name="SpanLabel" Foreground="{StaticResource FgDim}" FontSize="11"
+                                   VerticalAlignment="Center" Margin="8,0,6,0"/>
+                    </StackPanel>
+                </Border>
+            </Grid>
+            <Grid Grid.Row="1" Margin="64,2,10,3" MinHeight="16">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <ScrollBar x:Name="TimeScroll" Grid.Column="0" Orientation="Horizontal"
+                           HorizontalAlignment="Stretch" VerticalAlignment="Center"
+                           Style="{StaticResource TimeScrollBarStyle}"
+                           Minimum="0" Maximum="0" Value="0" ViewportSize="600"
+                           IsEnabled="False" Scroll="OnTimeScroll"
+                           ToolTip="끌어서 지난 기록(최대 12시간)을 봅니다. 오른쪽 끝으로 끌면 다시 실시간을 따라갑니다."/>
+                <TextBlock x:Name="TimeRangeLabel" Grid.Column="1" Margin="10,0,2,0"
+                           Foreground="{StaticResource FgDim}" FontSize="11"
+                           VerticalAlignment="Center" MinWidth="132" TextAlignment="Right"/>
+            </Grid>
         </Grid>
 
         <!-- stat strip -->

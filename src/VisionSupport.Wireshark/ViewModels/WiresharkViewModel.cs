@@ -27,7 +27,8 @@ public sealed partial class WiresharkViewModel : ObservableObject, IDisposable
     private const int MaxAnomalies = 1000;
     private const int MaxDrainPerTick = 5_000;
     private const int MaxQueued = 100_000;
-    private const int ChartSeconds = 600;
+    /// <summary>Twelve hours at 1 Hz, as long as the memory monitor keeps; the chart pans across it.</summary>
+    private const int ChartSeconds = 12 * 3600;
 
     private readonly WiresharkSettingsStore _store;
     private readonly WiresharkSettings _settings;
