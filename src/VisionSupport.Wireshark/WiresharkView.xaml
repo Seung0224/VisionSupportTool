@@ -1,0 +1,6 @@
+<UserControl x:Class="VisionSupport.Wireshark.WiresharkView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Background="{StaticResource Bg}">
+    <TextBlock Text="통신 모니터" Foreground="{StaticResource Fg}" Margin="16"/>
+</UserControl>

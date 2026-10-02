@@ -128,6 +128,7 @@ public partial class App : Application
     {
         new MemoryMonitorFeature(),
         new PlcServerFeature(),
+        new WiresharkFeature(),
     };
 
     private void OnDispatcherUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)

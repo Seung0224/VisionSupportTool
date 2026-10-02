@@ -23,7 +23,7 @@ public class LauncherIconTests
         var settings = new LauncherSettings();
         var launcher = new LauncherViewModel(
             new IFeatureModule[] { new ImageConverterFeature() },
-            new IFeatureModule[] { new MemoryMonitorFeature(), new PlcServerFeature() },
+            new IFeatureModule[] { new MemoryMonitorFeature(), new PlcServerFeature(), new WiresharkFeature() },
             new ActivityLog(), settings, new LauncherAppearance(settings), DateTime.Now);
 
         Assert.NotEmpty(launcher.Items);

@@ -19,6 +19,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "VisionSupport.ImageConverte
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "VisionSupport.Sam", "src\VisionSupport.Sam\VisionSupport.Sam.csproj", "{03975B60-B54D-45C0-94A2-9E0314AF5818}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "VisionSupport.Wireshark", "src\VisionSupport.Wireshark\VisionSupport.Wireshark.csproj", "{FC347529-D7D0-4CD6-96DB-CD399079C6B5}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -101,6 +103,18 @@ Global
 		{03975B60-B54D-45C0-94A2-9E0314AF5818}.Release|x64.Build.0 = Release|Any CPU
 		{03975B60-B54D-45C0-94A2-9E0314AF5818}.Release|x86.ActiveCfg = Release|Any CPU
 		{03975B60-B54D-45C0-94A2-9E0314AF5818}.Release|x86.Build.0 = Release|Any CPU
+		{FC347529-D7D0-4CD6-96DB-CD399079C6B5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{FC347529-D7D0-4CD6-96DB-CD399079C6B5}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{FC347529-D7D0-4CD6-96DB-CD399079C6B5}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{FC347529-D7D0-4CD6-96DB-CD399079C6B5}.Debug|x64.Build.0 = Debug|Any CPU
+		{FC347529-D7D0-4CD6-96DB-CD399079C6B5}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{FC347529-D7D0-4CD6-96DB-CD399079C6B5}.Debug|x86.Build.0 = Debug|Any CPU
+		{FC347529-D7D0-4CD6-96DB-CD399079C6B5}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{FC347529-D7D0-4CD6-96DB-CD399079C6B5}.Release|Any CPU.Build.0 = Release|Any CPU
+		{FC347529-D7D0-4CD6-96DB-CD399079C6B5}.Release|x64.ActiveCfg = Release|Any CPU
+		{FC347529-D7D0-4CD6-96DB-CD399079C6B5}.Release|x64.Build.0 = Release|Any CPU
+		{FC347529-D7D0-4CD6-96DB-CD399079C6B5}.Release|x86.ActiveCfg = Release|Any CPU
+		{FC347529-D7D0-4CD6-96DB-CD399079C6B5}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -112,5 +126,6 @@ Global
 		{D7E54823-872F-4303-BB89-B1775C972715} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 		{6B5CC6EC-FC83-4CC5-AC03-4C92B3941D5C} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 		{03975B60-B54D-45C0-94A2-9E0314AF5818} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
+		{FC347529-D7D0-4CD6-96DB-CD399079C6B5} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 	EndGlobalSection
 EndGlobal
