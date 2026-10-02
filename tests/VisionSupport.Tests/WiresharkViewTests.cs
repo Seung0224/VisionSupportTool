@@ -18,7 +18,7 @@ public class WiresharkViewTests
     [Fact]
     public void The_view_builds_against_the_shell_theme() => _app.Run(() =>
     {
-        OverviewDialogAutomationTests.EnsureShellResourcesMerged();
+        ShellTheme.EnsureMerged();
         using var dir = new TempDir();
         using var vm = new WiresharkViewModel(new WiresharkSettingsStore(Path.Combine(dir.Path, "s.json")), new ManualClock());
 
@@ -31,7 +31,7 @@ public class WiresharkViewTests
     [Fact]
     public void The_view_renders_with_an_empty_chart() => _app.Run(() =>
     {
-        OverviewDialogAutomationTests.EnsureShellResourcesMerged();
+        ShellTheme.EnsureMerged();
         using var dir = new TempDir();
         using var vm = new WiresharkViewModel(new WiresharkSettingsStore(Path.Combine(dir.Path, "s.json")), new ManualClock());
         var window = new Window
