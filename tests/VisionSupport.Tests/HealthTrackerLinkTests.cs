@@ -122,6 +122,21 @@ public class HealthTrackerLinkTests
         Assert.Equal(0, Target(TestFrames.Camera).DropCount);
     }
 
+    /// <summary>Frames sent while nobody was capturing were not dropped by the camera.</summary>
+    [Fact]
+    public void Restarting_the_capture_does_not_count_the_frames_missed_while_stopped()
+    {
+        LearnCamera();
+        Frame(1, 1);
+        _tracker.StopListening();
+        _tracker.StartListening();
+        Frame(5000, 1);
+        _clock.Advance(2);
+        _tracker.Tick();
+
+        Assert.Equal(0, Target(TestFrames.Camera).DropCount);
+    }
+
     /// <summary>When ETW itself lost events, a gap in the stream may be ours, not the camera's.</summary>
     [Fact]
     public void A_drop_seen_while_the_capture_was_losing_events_is_only_a_warning()

@@ -185,6 +185,37 @@ public class HealthTrackerTests
         Assert.True(_tracker.HasAlert);
     }
 
+    /// <summary>Stopping the capture is not the PLC going quiet.</summary>
+    [Fact]
+    public void After_capture_stops_targets_read_capture_off_instead_of_cut_off()
+    {
+        _tracker.Pin(Plc, TargetKind.Mc, "검사기 PLC");
+        Request();
+        Response();
+        Request(); // in flight when the capture stops
+        _tracker.StopListening();
+        _clock.Advance(60);
+        _tracker.Tick();
+
+        Assert.Equal(HealthLevel.Idle, Plc0().Level);
+        Assert.Equal("캡처 꺼짐", Plc0().Summary);
+        Assert.Empty(_tracker.DrainAnomalies());
+        Assert.False(_tracker.HasAlert);
+    }
+
+    [Fact]
+    public void Listening_again_resumes_judging()
+    {
+        _tracker.Pin(Plc, TargetKind.Mc, "검사기 PLC");
+        _tracker.StopListening();
+        _tracker.StartListening();
+        Request();
+        _clock.Advance(1.5);
+        _tracker.Tick();
+
+        Assert.Equal(HealthLevel.Bad, Plc0().Level);
+    }
+
     [Fact]
     public void Unpinning_a_target_never_seen_removes_it()
     {

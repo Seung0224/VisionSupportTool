@@ -20,6 +20,9 @@ public sealed partial class HealthTracker
     private readonly TimeProvider _clock;
     private DateTime _acknowledgedAt = DateTime.MinValue;
 
+    /// <summary>False while the capture is stopped: silence then means nothing about the target.</summary>
+    private bool _listening = true;
+
     public HealthTracker(HealthThresholds thresholds, TimeProvider clock)
     {
         _t = thresholds;
@@ -56,6 +59,31 @@ public sealed partial class HealthTracker
             if (t.LastSeen is null) _targets.Remove(id);
             else t.Pinned = false;
         }
+    }
+
+    /// <summary>
+    /// The capture stopped. Packet-fed targets read "캡처 꺼짐" instead of going red, requests in
+    /// flight are forgotten, and sequence/stream state is dropped so a later restart does not
+    /// count the gap as retransmits or lost frames.
+    /// </summary>
+    public void StopListening()
+    {
+        lock (_gate)
+        {
+            _listening = false;
+            ResetTransport();
+            foreach (TargetState t in _targets.Values)
+            {
+                t.Correlated.Clear();
+                t.Fifo.Clear();
+                t.SilenceReported = false;
+            }
+        }
+    }
+
+    public void StartListening()
+    {
+        lock (_gate) _listening = true;
     }
 
     public void Observe(Packet packet)
@@ -231,6 +259,7 @@ public sealed partial class HealthTracker
 
     private void CheckTimeouts(TargetState t, DateTime now)
     {
+        if (!_listening) return;
         foreach (Pending p in t.AllPending())
         {
             if (p.Reported || (now - p.Sent).TotalMilliseconds < _t.ResponseTimeoutMs) continue;
@@ -241,7 +270,7 @@ public sealed partial class HealthTracker
 
     private void CheckSilence(TargetState t, DateTime now)
     {
-        if (!t.Pinned || t.Kind is TargetKind.Nic or TargetKind.Cxp) return;
+        if (!_listening || !t.Pinned || t.Kind is TargetKind.Nic or TargetKind.Cxp) return;
         if (t.LastSeen is not { } seen || t.SilenceReported) return;
         if ((now - seen).TotalSeconds < _t.SilenceSeconds) return;
         t.SilenceReported = true;
@@ -261,6 +290,7 @@ public sealed partial class HealthTracker
 
         (HealthLevel level, string summary) = true switch
         {
+            _ when !_listening && t.Kind is not TargetKind.Cxp => (HealthLevel.Idle, "캡처 꺼짐"),
             _ when t.LinkDown => (HealthLevel.Bad, t.LinkDownText),
             _ when unanswered > TimeSpan.Zero => (HealthLevel.Bad, $"응답 없음 {unanswered.TotalSeconds:0.0}초째"),
             _ when t.SilenceReported && t.LastSeen is { } s => (HealthLevel.Bad, $"트래픽 끊김 {(now - s).TotalSeconds:0}초째"),

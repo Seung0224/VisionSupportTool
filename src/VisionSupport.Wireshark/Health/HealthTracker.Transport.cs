@@ -5,8 +5,8 @@ namespace VisionSupport.Wireshark.Health;
 
 public sealed partial class HealthTracker
 {
-    private readonly TcpAnalyzer _tcp = new();
-    private readonly GvspAnalyzer _gvsp = new();
+    private TcpAnalyzer _tcp = new();
+    private GvspAnalyzer _gvsp = new();
     private readonly Dictionary<string, Dictionary<int, CxpConnectionStatus>> _cxpPrevious = new();
     private readonly List<PendingDrop> _pendingDrops = new();
     private long _captureLostTotal;
@@ -126,6 +126,13 @@ public sealed partial class HealthTracker
             packet.IsAnomalous = true;
             _pendingDrops.Add(new PendingDrop(target, lost, packet.Time, packet.Number));
         }
+    }
+
+    private void ResetTransport()
+    {
+        _tcp = new TcpAnalyzer();
+        _gvsp = new GvspAnalyzer();
+        _pendingDrops.Clear();
     }
 
     /// <summary>

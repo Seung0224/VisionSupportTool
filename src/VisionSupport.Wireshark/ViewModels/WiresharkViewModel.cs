@@ -172,6 +172,7 @@ public sealed partial class WiresharkViewModel : ObservableObject, IDisposable
             CaptureError = "캡처를 시작할 수 없음: " + ex.Message;
             return;
         }
+        _health.StartListening();
         _capture = source;
         IsCapturing = true;
     }
@@ -181,6 +182,7 @@ public sealed partial class WiresharkViewModel : ObservableObject, IDisposable
     {
         _capture?.Dispose();
         _capture = null;
+        _health.StopListening();
         IsCapturing = false;
     }
 
