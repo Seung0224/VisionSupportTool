@@ -27,20 +27,35 @@ internal sealed class GvspAnalyzer
             _streams.Add(streamId, s);
         }
 
+        // Tracking starts at the first leader: on a running line the capture nearly always
+        // begins in the middle of a frame, and that frame's missing start is ours, not the camera's.
+        if (s.LastBlock is null)
+        {
+            if (h.Format != GvspFormat.Leader) return 0;
+            StartBlock(s, h);
+            return 0;
+        }
+
         int lost = 0;
         if (s.LastBlock != h.BlockId)
         {
-            if (s.LastBlock is { } last) lost += Gap(last, h.BlockId, h.ExtendedId);
-            s.LastBlock = h.BlockId;
-            s.InBlock = true;
-            s.Broken = false;
+            long step = Step(s.LastBlock.Value, h.BlockId, h.ExtendedId);
+            if (step < 0)
+            {
+                // Backwards: a resent packet of an earlier frame (ignore it), or the stream
+                // restarting from block 1 (follow it, nothing lost).
+                if (h.Format == GvspFormat.Leader) StartBlock(s, h);
+                return 0;
+            }
+
+            lost += (int)Math.Min(step - 1, int.MaxValue);
+            StartBlock(s, h);
             if (h.Format != GvspFormat.Leader && h.PacketId != 0)
             {
                 // This block's leader never arrived.
                 s.Broken = true;
                 lost += 1;
             }
-            s.NextPacket = h.PacketId + 1;
         }
         else if (s.InBlock)
         {
@@ -56,12 +71,22 @@ internal sealed class GvspAnalyzer
         return lost;
     }
 
-    /// <summary>Whole frames skipped between two block ids. 16-bit ids wrap 65535 → 1 (0 is never used).</summary>
-    private static int Gap(ulong last, ulong current, bool extended)
+    private static void StartBlock(Stream s, GvspHeader h)
     {
-        ulong step = extended
-            ? (current > last ? current - last : 1)
-            : (current > last ? current - last : current + 65535 - last);
-        return step > 1 ? (int)Math.Min(step - 1, int.MaxValue) : 0;
+        s.LastBlock = h.BlockId;
+        s.InBlock = true;
+        s.Broken = false;
+        s.NextPacket = h.PacketId + 1;
+    }
+
+    /// <summary>
+    /// How far the block id moved forward; negative when it went back. 16-bit ids run 1..65535
+    /// and skip 0, so a fall of more than half the range is a wrap, anything less is going back.
+    /// </summary>
+    private static long Step(ulong last, ulong current, bool extended)
+    {
+        if (current > last) return (long)Math.Min(current - last, long.MaxValue);
+        if (!extended && last - current >= 32768) return (long)(current + 65535 - last);
+        return -1;
     }
 }

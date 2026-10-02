@@ -122,6 +122,39 @@ public class HealthTrackerLinkTests
         Assert.Equal(0, Target(TestFrames.Camera).DropCount);
     }
 
+    /// <summary>On a running line the capture almost always starts in the middle of a frame.</summary>
+    [Fact]
+    public void Starting_the_capture_mid_frame_is_not_a_drop()
+    {
+        LearnCamera();
+        Send(TestFrames.Gvsp(7, 5, GvspFormat.Payload));
+        Send(TestFrames.Gvsp(7, 6, GvspFormat.Trailer));
+        Frame(8, 1, 2);
+        _clock.Advance(2);
+        _tracker.Tick();
+
+        Assert.Equal(0, Target(TestFrames.Camera).DropCount);
+    }
+
+    /// <summary>A resent packet of the previous frame, or a stream restarting at block 1, is not 65 534 lost frames.</summary>
+    [Fact]
+    public void A_block_id_going_back_is_a_resend_or_a_restart_not_a_wrap()
+    {
+        LearnCamera();
+        Frame(1, 1, 2);
+        Frame(2, 1, 2);
+        Send(TestFrames.Gvsp(1, 2, GvspFormat.Payload)); // resend of block 1
+        Frame(3, 1, 2);
+        Frame(500, 1);
+        Frame(501, 1);
+        Frame(1, 1);                                       // stream restarted
+        Frame(2, 1);
+        _clock.Advance(2);
+        _tracker.Tick();
+
+        Assert.Equal(496, Target(TestFrames.Camera).DropCount); // only 4..499 between block 3 and 500
+    }
+
     /// <summary>Frames sent while nobody was capturing were not dropped by the camera.</summary>
     [Fact]
     public void Restarting_the_capture_does_not_count_the_frames_missed_while_stopped()
