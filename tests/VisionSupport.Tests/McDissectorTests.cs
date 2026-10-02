@@ -55,11 +55,6 @@ public class McDissectorTests
     }
 
     [Fact]
-    public void Mc_bytes_on_a_port_outside_the_range_are_not_read_as_mc()
-        => Assert.Null(TestFrames.Dissect(
-            TestFrames.Tcp("192.168.0.2", 50000, "192.168.0.10", 8080, TestFrames.McReadRequest3E)).App);
-
-    [Fact]
     public void A_request_header_travelling_from_the_plc_is_not_a_request()
         => Assert.Null(Over5000(TestFrames.McReadRequest3E, toPlc: false).App);
 
@@ -69,5 +64,22 @@ public class McDissectorTests
         Packet p = Over5000(TestFrames.McOkResponse3E.Concat(TestFrames.McOkResponse3E).ToArray(), toPlc: false);
 
         Assert.Equal(2, p.Messages.Count);
+    }
+
+    /// <summary>A PLC may listen on any port; a frame whose length field adds up is MC wherever it is.</summary>
+    [Fact]
+    public void A_well_formed_frame_is_read_as_mc_on_any_port()
+    {
+        Packet p = TestFrames.Dissect(TestFrames.Tcp("192.168.0.2", 50000, "192.168.0.10", 2000, TestFrames.McReadRequest3E));
+
+        Assert.Equal("MC", p.Protocol);
+    }
+
+    [Fact]
+    public void Bytes_that_only_start_like_mc_are_not_mc_off_the_mc_ports()
+    {
+        byte[] lookalike = TestFrames.McReadRequest3E.Concat(new byte[] { 1, 2, 3 }).ToArray();
+
+        Assert.Null(TestFrames.Dissect(TestFrames.Tcp("192.168.0.2", 50000, "192.168.0.10", 2000, lookalike)).App);
     }
 }

@@ -50,6 +50,7 @@ public sealed partial class WiresharkViewModel : ObservableObject, IDisposable
     private Task? _cxpLoop;
     private volatile int _nicFilter = -1;
     private long _nextNumber;
+    private long _capturedBytes;
     private bool _disposed;
 
     public WiresharkViewModel() : this(WiresharkSettingsStore.Default, TimeProvider.System)
@@ -96,6 +97,10 @@ public sealed partial class WiresharkViewModel : ObservableObject, IDisposable
     [ObservableProperty] private string _status = string.Empty;
     [ObservableProperty] private string _captureError = string.Empty;
     [ObservableProperty] private string _cxpMessage = string.Empty;
+
+    /// <summary>Whether any PLC or camera card exists; without one the card row explains why.</summary>
+    [ObservableProperty] private bool _hasDeviceCards;
+    [ObservableProperty] private string _noDevicesText = DescribeNoDevices(false, 0);
 
     /// <summary>Whether this PC has the CXP grabber. Without one, nothing CXP is shown or started.</summary>
     [ObservableProperty] private bool _hasCxpBoard;
@@ -297,7 +302,8 @@ public sealed partial class WiresharkViewModel : ObservableObject, IDisposable
     private void FocusCard(TargetCardViewModel card)
     {
         FocusedCard = card;
-        FilterText = "id:" + card.Id;
+        // The NIC and CXP cards are the whole port, not one device: show everything.
+        FilterText = card.CanPin ? "id:" + card.Id : string.Empty;
         SelectedPacket = Rows.LastOrDefault(p => p.IsAnomalous) ?? Rows.LastOrDefault();
         ChartUpdated?.Invoke(this, EventArgs.Empty);
     }
@@ -354,6 +360,7 @@ public sealed partial class WiresharkViewModel : ObservableObject, IDisposable
         if (nic >= 0 && frame.ComponentId != nic) return;
 
         long number = Interlocked.Increment(ref _nextNumber);
+        Interlocked.Add(ref _capturedBytes, frame.OriginalLength);
         Packet packet = FrameDissector.Dissect(number, frame.Time, frame.Data, frame.OriginalLength, _context);
         _health.Observe(packet);
 
@@ -396,7 +403,11 @@ public sealed partial class WiresharkViewModel : ObservableObject, IDisposable
         if (_capture is { } capture)
         {
             _health.ReportCaptureLoss(capture.EventsLost);
-            if (SelectedNic is { } nic) _health.ReportLink(nic.Mac, nic.Name, NicCatalog.IsUp(nic.Mac) ?? false);
+            if (SelectedNic is { } nic)
+            {
+                _health.ReportLink(nic.Mac, nic.Name, NicCatalog.IsUp(nic.Mac) ?? false);
+                _health.ReportNicTraffic(nic.Mac, Interlocked.Read(ref _capturedBytes));
+            }
         }
         _health.Tick();
         UpdateCards();
@@ -455,8 +466,18 @@ public sealed partial class WiresharkViewModel : ObservableObject, IDisposable
     /// Worst state among the targets that matter: pinned ones and the machine's own NIC/board, or
     /// every card while nothing is pinned yet. Counts how many are in that state.
     /// </summary>
+    public static string DescribeNoDevices(bool capturing, long packets) => (capturing, packets) switch
+    {
+        (false, _) => "감시를 시작하면 PLC 와 카메라가 여기 나타납니다.",
+        (true, 0) => "패킷을 기다리는 중입니다…",
+        _ => $"패킷 {packets:N0}개를 받았지만 PLC(MC·ADS)·GigE 카메라 통신은 아직 보이지 않습니다. 인터페이스가 맞는지 확인하세요.",
+    };
+
     private void UpdateOverall()
     {
+        HasDeviceCards = Cards.Any(c => c.CanPin);
+        NoDevicesText = DescribeNoDevices(IsCapturing, Interlocked.Read(ref _nextNumber));
+
         List<TargetCardViewModel> watched = Cards.Where(c => c.Pinned || !c.CanPin).ToList();
         if (watched.Count == 0) watched = Cards.ToList();
         if (watched.Count == 0)

@@ -27,6 +27,26 @@ public static class McDissector
         return true;
     }
 
+    /// <summary>
+    /// Whether the payload is nothing but whole MC frames, back to back - the bar for calling a
+    /// segment MC when it is not on a known MC port.
+    /// </summary>
+    public static bool IsExactFrameRun(ReadOnlySpan<byte> p)
+    {
+        int at = 0;
+        while (at < p.Length)
+        {
+            ReadOnlySpan<byte> rest = p[at..];
+            if (rest.Length < 2 || rest[1] != 0x00) return false;
+            int b = rest[0] switch { 0x50 or 0xD0 => 2, 0x54 or 0xD4 => 6, _ => -1 };
+            if (b < 0 || rest.Length < b + 7) return false;
+            int length = b + 7 + BinaryPrimitives.ReadUInt16LittleEndian(rest[(b + 5)..]);
+            if (length > rest.Length || length < b + 9) return false;
+            at += length;
+        }
+        return at == p.Length && at > 0;
+    }
+
     private static bool TryReadOne(ReadOnlySpan<byte> p, int offset, Packet packet, bool toServer, out int length)
     {
         length = 0;

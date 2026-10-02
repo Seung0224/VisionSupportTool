@@ -39,6 +39,15 @@ public sealed partial class HealthTracker
         }
     }
 
+    /// <summary>Total bytes captured on this NIC so far; the NIC card's chart is that traffic.</summary>
+    public void ReportNicTraffic(string nicId, long totalBytes)
+    {
+        lock (_gate)
+        {
+            if (_targets.TryGetValue(nicId, out TargetState? t)) t.Bytes = totalBytes;
+        }
+    }
+
     public void ReportCxp(CxpReport report)
     {
         lock (_gate)

@@ -163,6 +163,12 @@ public static class FrameDissector
         {
             AdsDissector.TryDissect(payload, payloadAt, packet, toServer: dp == context.AdsPort);
         }
+        else if (McDissector.IsExactFrameRun(payload))
+        {
+            // MC on a port outside the configured range: accepted only when the length fields
+            // account for every byte, and direction comes from the subheader itself.
+            McDissector.TryDissect(payload, payloadAt, packet, toServer: payload[0] is 0x50 or 0x54);
+        }
     }
 
     private static void DissectUdp(Packet packet, int at, DissectorContext context)

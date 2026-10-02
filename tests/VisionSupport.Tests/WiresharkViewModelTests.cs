@@ -106,4 +106,24 @@ public class WiresharkViewModelTests
         vm.Dispose();
         vm.Dispose();
     });
+
+    /// <summary>The NIC card is "everything on this port": focusing it must not filter the list empty.</summary>
+    [Fact]
+    public void Focusing_the_nic_card_shows_every_packet() => _app.Run(() =>
+    {
+        using var dir = new TempDir();
+        using var vm = new WiresharkViewModel(new WiresharkSettingsStore(Path.Combine(dir.Path, "s.json")), new ManualClock());
+        vm.FilterText = "MC";
+
+        vm.FocusCardCommand.Execute(new TargetCardViewModel("00-11-22-33-44-55", TargetKind.Nic));
+
+        Assert.Equal(string.Empty, vm.FilterText);
+    });
+
+    [Theory]
+    [InlineData(false, 0, "감시를 시작하면 PLC 와 카메라가 여기 나타납니다.")]
+    [InlineData(true, 0, "패킷을 기다리는 중입니다…")]
+    [InlineData(true, 8015, "패킷 8,015개를 받았지만 PLC(MC·ADS)·GigE 카메라 통신은 아직 보이지 않습니다. 인터페이스가 맞는지 확인하세요.")]
+    public void The_card_area_says_why_it_is_empty(bool capturing, long packets, string expected)
+        => Assert.Equal(expected, WiresharkViewModel.DescribeNoDevices(capturing, packets));
 }

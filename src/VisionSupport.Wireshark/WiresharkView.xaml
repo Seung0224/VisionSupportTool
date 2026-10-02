@@ -147,22 +147,23 @@
         <!-- overall badge + one card per target -->
         <Border Grid.Row="1" BorderBrush="{StaticResource Border}" BorderThickness="0,0,0,1" Padding="12,10,12,4">
             <DockPanel>
-                <Border DockPanel.Dock="Left" Width="150" Margin="0,0,10,6" Padding="14,10"
-                        Background="{StaticResource Panel}" CornerRadius="8"
+                <!-- One-glance answer. Sized to its text, as tall as a card, never wider than it needs. -->
+                <Border DockPanel.Dock="Left" Height="52" MinWidth="104" Margin="0,0,8,6" Padding="12,0"
+                        VerticalAlignment="Top" Background="{StaticResource Panel}" CornerRadius="8"
                         BorderBrush="{Binding OverallLevel, Converter={StaticResource HealthBrush}}"
-                        BorderThickness="1">
+                        BorderThickness="1" ToolTip="고정한 대상 중 가장 나쁜 상태입니다.">
                     <StackPanel VerticalAlignment="Center">
                         <TextBlock Text="전체 상태" Foreground="{StaticResource FgDim}" FontSize="11"/>
-                        <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
-                            <Ellipse Width="12" Height="12" VerticalAlignment="Center" Margin="0,0,8,0"
+                        <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
+                            <Ellipse Width="9" Height="9" VerticalAlignment="Center" Margin="0,0,6,0"
                                      Fill="{Binding OverallLevel, Converter={StaticResource HealthBrush}}"/>
-                            <TextBlock Text="{Binding OverallText}" FontSize="20" FontWeight="SemiBold"
+                            <TextBlock Text="{Binding OverallText}" FontSize="14" FontWeight="SemiBold"
                                        Foreground="{Binding OverallLevel, Converter={StaticResource HealthBrush}}"/>
                         </StackPanel>
                     </StackPanel>
                 </Border>
 
-                <Grid>
+                <StackPanel>
                     <ItemsControl ItemsSource="{Binding Cards}">
                         <ItemsControl.ItemsPanel>
                             <ItemsPanelTemplate>
@@ -171,7 +172,7 @@
                         </ItemsControl.ItemsPanel>
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
-                                <Grid Width="240" Height="64" Margin="0,0,8,6" Cursor="Hand"
+                                <Grid Width="220" Height="52" Margin="0,0,8,6" Cursor="Hand"
                                       Background="Transparent" MouseLeftButtonUp="OnCardClicked"
                                       ToolTip="눌러서 이 대상의 패킷과 차트를 봅니다.">
                                     <Border Background="{StaticResource Panel}" CornerRadius="8"/>
@@ -183,7 +184,7 @@
                                             Visibility="{Binding Pinned, Converter={StaticResource BoolToVis}}"/>
                                     <Border Width="4" HorizontalAlignment="Left" CornerRadius="8,0,0,8"
                                             Background="{Binding Level, Converter={StaticResource HealthBrush}}"/>
-                                    <DockPanel Margin="14,8,8,8">
+                                    <DockPanel Margin="12,6,8,6">
                                         <DockPanel DockPanel.Dock="Top">
                                             <Button DockPanel.Dock="Right" Padding="8,1" FontSize="11" MinWidth="0"
                                                     Command="{Binding DataContext.TogglePinCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
@@ -205,7 +206,7 @@
                                             <TextBlock Text="{Binding Name}" Foreground="{StaticResource Fg}" FontWeight="SemiBold"
                                                        VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
                                         </DockPanel>
-                                        <TextBlock Text="{Binding Summary}" Margin="0,6,0,0" FontSize="13"
+                                        <TextBlock Text="{Binding Summary}" Margin="0,3,0,0" FontSize="12"
                                                    Foreground="{Binding Level, Converter={StaticResource HealthBrush}}"
                                                    TextTrimming="CharacterEllipsis" ToolTip="{Binding Summary}"/>
                                     </DockPanel>
@@ -213,11 +214,11 @@
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
-                    <TextBlock Text="감시를 시작하면 PLC 와 GigE 카메라가 여기 후보(점선)로 나타납니다. 고정한 대상이 끊기거나 늦어지면 빨갛게 바뀝니다."
-                               Foreground="{StaticResource FgDim}" VerticalAlignment="Center" TextWrapping="Wrap"
-                               Margin="4,0,0,6"
-                               Visibility="{Binding Cards.Count, Converter={StaticResource ZeroToVis}}"/>
-                </Grid>
+                    <!-- Why there is no PLC or camera card yet - the question an empty row raises. -->
+                    <TextBlock Text="{Binding NoDevicesText}" Foreground="{StaticResource FgDim}" TextWrapping="Wrap"
+                               Margin="2,2,0,6"
+                               Visibility="{Binding HasDeviceCards, Converter={StaticResource NotBoolToVis}}"/>
+                </StackPanel>
             </DockPanel>
         </Border>
 
@@ -344,6 +345,10 @@
                                  ToolTip="공백으로 나눈 단어가 모두 맞는 패킷만 보입니다. !단어 = 제외, id:대상 = 그 대상만, 이상 = 문제 패킷만. 예) MC !192.168.0.5"/>
                     </DockPanel>
 
+                    <TextBlock Grid.Row="1" Panel.ZIndex="1" HorizontalAlignment="Center" VerticalAlignment="Center"
+                               Foreground="{StaticResource FgDim}" IsHitTestVisible="False"
+                               Text="표시할 패킷이 없습니다. 필터를 지우거나 감시를 시작하세요."
+                               Visibility="{Binding Rows.Count, Converter={StaticResource ZeroToVis}}"/>
                     <DataGrid Grid.Row="1" ItemsSource="{Binding Rows}" SelectedItem="{Binding SelectedPacket}"
                               SelectionMode="Single" FontFamily="Consolas" FontSize="12">
                         <DataGrid.RowStyle>

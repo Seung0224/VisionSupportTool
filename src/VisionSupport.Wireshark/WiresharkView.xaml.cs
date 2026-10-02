@@ -100,9 +100,12 @@ public partial class WiresharkView : UserControl, IDisposable
         plot.DataBackground.Color = PlotColor.FromHex("#1E1E1E");
         plot.Axes.Color(PlotColor.FromHex("#9D9D9D"));
         plot.Grid.MajorLineColor = PlotColor.FromHex("#2F2F2F");
-        plot.Axes.Left.Label.Text = "송수신 B/s";
-        plot.Axes.Right.Label.Text = "응답 ms";
-        plot.Axes.Bottom.Label.Text = "시각";
+        // No axis titles: the right one clips in a narrow window. The legend names both lines.
+        plot.Legend.FontName = PlotFonts.Default;
+        plot.Legend.FontColor = PlotColor.FromHex("#D4D4D4");
+        plot.Legend.BackgroundColor = PlotColor.FromHex("#252526");
+        plot.Legend.OutlineColor = PlotColor.FromHex("#3F3F46");
+        plot.Legend.Alignment = Alignment.UpperRight;
         foreach (var axis in new IAxis[] { plot.Axes.Bottom, plot.Axes.Left, plot.Axes.Right })
         {
             axis.Label.FontName = PlotFonts.Default;
@@ -159,11 +162,14 @@ public partial class WiresharkView : UserControl, IDisposable
         traffic.MarkerSize = 0;
         traffic.LineWidth = 2;
         traffic.Color = PlotColor.FromHex("#1F9CF0");
+        traffic.LegendText = "송수신 B/s (왼쪽)";
         var answer = plot.Add.Scatter(xs, response);
         answer.MarkerSize = 0;
         answer.LineWidth = 2;
         answer.Color = PlotColor.FromHex("#DCDCAA");
         answer.Axes.YAxis = plot.Axes.Right;
+        answer.LegendText = "응답 ms (오른쪽)";
+        plot.ShowLegend();
 
         plot.Axes.AutoScale();                     // Y fits the visible points...
         plot.Axes.SetLimitsX(viewStart, viewEnd);  // ...then X is pinned to the time window

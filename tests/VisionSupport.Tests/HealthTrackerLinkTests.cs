@@ -299,4 +299,15 @@ public class HealthTrackerLinkTests
 
         Assert.Equal("CXP 링크 끊김 (커넥션 0)", Target("Rapixo#0").Summary);
     }
+
+    /// <summary>The NIC card's chart shows how much went through that port.</summary>
+    [Fact]
+    public void The_nic_card_carries_the_traffic_counted_on_that_port()
+    {
+        _tracker.ReportLink("00-11-22-33-44-55", "PLC", up: true);
+        _tracker.ReportNicTraffic("00-11-22-33-44-55", 12_345);
+        _tracker.Tick();
+
+        Assert.Equal(12_345, Target("00-11-22-33-44-55").Bytes);
+    }
 }
