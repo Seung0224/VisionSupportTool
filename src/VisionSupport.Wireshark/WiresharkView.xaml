@@ -62,19 +62,12 @@
                               ToolTip="비워 두면 모든 NIC를 봅니다. 캡처 중에 바꾸면 그 NIC 것만 이어서 받습니다."/>
                     <Button Content="새로고침" Command="{Binding RefreshNicsCommand}" Margin="6,0,6,0"
                             ToolTip="pktmon 이 보는 NIC 목록을 다시 읽습니다."/>
-                    <Button Content="캡처 시작" Command="{Binding StartCaptureCommand}"
+                    <Button Content="감시 시작" Command="{Binding StartCaptureCommand}"
                             Background="{StaticResource Accent}"
-                            IsEnabled="{Binding IsCapturing, Converter={StaticResource Not}}"
-                            ToolTip="Windows 내장 pktmon 으로 이 PC 의 NIC 를 오가는 패킷을 받습니다. 설치할 것은 없습니다."/>
-                    <Button Content="캡처 중지" Command="{Binding StopCaptureCommand}"
-                            IsEnabled="{Binding IsCapturing}"/>
-                    <Rectangle Style="{StaticResource Separator}"/>
-                    <Button Content="CXP 감시 시작" Command="{Binding StartCxpCommand}"
-                            Background="{StaticResource Accent}"
-                            IsEnabled="{Binding IsCxpWatching, Converter={StaticResource Not}}"
-                            ToolTip="Rapixo CXP 보드의 연결과 링크 상태·에러 카운터를 1초마다 읽습니다. 보드를 붙잡고 있지 않아 VISION 그랩을 막지 않습니다."/>
-                    <Button Content="CXP 감시 중지" Command="{Binding StopCxpCommand}"
-                            IsEnabled="{Binding IsCxpWatching}"/>
+                            IsEnabled="{Binding IsWorking, Converter={StaticResource Not}}"
+                            ToolTip="이 PC 의 랜카드를 오가는 통신을 받아 판정합니다. CXP 보드가 꽂힌 PC 라면 CXP 카메라도 같이 감시합니다."/>
+                    <Button Content="감시 중지" Command="{Binding StopCaptureCommand}"
+                            IsEnabled="{Binding IsWorking}"/>
                     <Rectangle Style="{StaticResource Separator}"/>
                     <Button Content="pcapng 저장" Click="OnExport"
                             ToolTip="보관 중인 패킷을 Wireshark 에서 열 수 있는 파일로 저장합니다."/>
@@ -152,7 +145,7 @@
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
-                    <TextBlock Text="캡처를 시작하면 MC·ADS 로 말하는 PLC 와 GigE 카메라가 여기 후보로 나타납니다. 고정한 대상이 끊기거나 늦어지면 빨갛게 바뀝니다."
+                    <TextBlock Text="감시를 시작하면 PLC 와 GigE 카메라가 여기 후보(점선)로 나타납니다. 고정한 대상이 끊기거나 늦어지면 빨갛게 바뀝니다."
                                Foreground="{StaticResource FgDim}" VerticalAlignment="Center" TextWrapping="Wrap"
                                Margin="4,0,0,6"
                                Visibility="{Binding Cards.Count, Converter={StaticResource ZeroToVis}}"/>
@@ -179,7 +172,7 @@
                             <Setter Property="Text" Value="{Binding Status}"/>
                             <Style.Triggers>
                                 <DataTrigger Binding="{Binding IsWorking}" Value="False">
-                                    <Setter Property="Text" Value="캡처와 CXP 감시가 꺼져 있습니다"/>
+                                    <Setter Property="Text" Value="감시가 꺼져 있습니다"/>
                                     <Setter Property="Foreground" Value="{StaticResource FgDim}"/>
                                 </DataTrigger>
                             </Style.Triggers>
@@ -292,7 +285,8 @@
                 </DataGrid>
             </TabItem>
 
-            <TabItem Header="CXP 카메라">
+            <TabItem Header="CXP 카메라"
+                     Visibility="{Binding HasCxpBoard, Converter={StaticResource BoolToVis}}">
                 <DockPanel Margin="8">
                     <Border DockPanel.Dock="Top" Margin="0,0,0,8" Padding="10,7" CornerRadius="4"
                             Background="{StaticResource Panel}" BorderBrush="{StaticResource Border}" BorderThickness="1">
@@ -306,7 +300,7 @@
                                         <Setter Property="Text" Value="{Binding CxpMessage}"/>
                                         <Style.Triggers>
                                             <DataTrigger Binding="{Binding IsCxpWatching}" Value="False">
-                                                <Setter Property="Text" Value="CXP 감시가 꺼져 있습니다. 위의 'CXP 감시 시작'을 누르세요."/>
+                                                <Setter Property="Text" Value="감시가 꺼져 있습니다. 위의 '감시 시작'을 누르면 CXP 보드도 함께 감시합니다."/>
                                             </DataTrigger>
                                         </Style.Triggers>
                                     </Style>
@@ -335,8 +329,8 @@
         <Border Grid.Row="5" Background="{StaticResource Panel}" BorderBrush="{StaticResource Border}"
                 BorderThickness="0,1,0,0" Padding="12,7">
             <DockPanel>
-                <TextBlock DockPanel.Dock="Right" Text="캡처 중" Foreground="#FF1F9CF0"
-                           Visibility="{Binding IsCapturing, Converter={StaticResource BoolToVis}}"/>
+                <TextBlock DockPanel.Dock="Right" Text="감시 중" Foreground="#FF1F9CF0"
+                           Visibility="{Binding IsWorking, Converter={StaticResource BoolToVis}}"/>
                 <!-- The last error wins the bar; with none, a one-line reminder of how to read the screen. -->
                 <TextBlock TextTrimming="CharacterEllipsis" ToolTip="{Binding CaptureError}">
                     <TextBlock.Style>
@@ -345,7 +339,7 @@
                             <Setter Property="Foreground" Value="{StaticResource StateFaulted}"/>
                             <Style.Triggers>
                                 <DataTrigger Binding="{Binding CaptureError}" Value="">
-                                    <Setter Property="Text" Value="카드 = 대상별 판정 · 이상 목록 = 언제 무엇이 잘못됐는지 · 캡처는 관리자 권한 필요"/>
+                                    <Setter Property="Text" Value="카드 = 대상별 판정 · 이상 목록 = 언제 무엇이 잘못됐는지"/>
                                     <Setter Property="Foreground" Value="{StaticResource FgDim}"/>
                                 </DataTrigger>
                             </Style.Triggers>

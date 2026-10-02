@@ -82,6 +82,22 @@ public class WiresharkViewModelTests
         Assert.Equal("감시 대상 없음", vm.OverallText);
     });
 
+    /// <summary>On a PC without the CXP grabber there is nothing CXP to show or start.</summary>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Cxp_controls_follow_whether_the_board_is_present(bool present) => _app.Run(() =>
+    {
+        using var dir = new TempDir();
+        using var vm = new WiresharkViewModel(new WiresharkSettingsStore(Path.Combine(dir.Path, "s.json")),
+            new ManualClock(), cxpPresence: () => present);
+
+        Assert.False(vm.HasCxpBoard);
+        vm.DetectCxp();
+
+        Assert.Equal(present, vm.HasCxpBoard);
+    });
+
     [Fact]
     public void Disposing_twice_is_harmless() => _app.Run(() =>
     {

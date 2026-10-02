@@ -28,6 +28,7 @@ public partial class WiresharkView : UserControl, IDisposable
         Loaded += (_, _) =>
         {
             if (_viewModel.Nics.Count == 0) _viewModel.RefreshNicsCommand.Execute(null);
+            _viewModel.DetectCxp();
         };
     }
 

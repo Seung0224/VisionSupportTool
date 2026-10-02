@@ -32,6 +32,7 @@ public sealed partial class WiresharkViewModel : ObservableObject, IDisposable
     private readonly WiresharkSettingsStore _store;
     private readonly WiresharkSettings _settings;
     private readonly TimeProvider _clock;
+    private readonly Func<bool> _cxpPresence;
     private readonly HealthTracker _health;
     private readonly PacketStore _packets;
     private readonly ConcurrentQueue<Packet> _incoming = new();
@@ -54,11 +55,12 @@ public sealed partial class WiresharkViewModel : ObservableObject, IDisposable
     {
     }
 
-    public WiresharkViewModel(WiresharkSettingsStore store, TimeProvider clock)
+    public WiresharkViewModel(WiresharkSettingsStore store, TimeProvider clock, Func<bool>? cxpPresence = null)
     {
         _store = store;
         _settings = store.Load();
         _clock = clock;
+        _cxpPresence = cxpPresence ?? (() => RapixoPresence.Query(_settings.CxpDeviceNameMatch).Present);
         _dispatcher = Dispatcher.CurrentDispatcher;
         _health = new HealthTracker(_settings.Thresholds, clock);
         foreach (PinnedTarget p in _settings.Pinned) _health.Pin(p.Id, p.Kind, p.Name);
@@ -93,6 +95,9 @@ public sealed partial class WiresharkViewModel : ObservableObject, IDisposable
     [ObservableProperty] private string _status = string.Empty;
     [ObservableProperty] private string _captureError = string.Empty;
     [ObservableProperty] private string _cxpMessage = string.Empty;
+
+    /// <summary>Whether this PC has the CXP grabber. Without one, nothing CXP is shown or started.</summary>
+    [ObservableProperty] private bool _hasCxpBoard;
 
     /// <summary>The one answer to "is anything wrong?", shown before any card.</summary>
     [ObservableProperty] private HealthLevel _overallLevel;
@@ -149,9 +154,27 @@ public sealed partial class WiresharkViewModel : ObservableObject, IDisposable
         }
     }
 
+    /// <summary>Looks for the CXP grabber in Device Manager. Called when the window opens.</summary>
+    public void DetectCxp()
+    {
+        try
+        {
+            HasCxpBoard = _cxpPresence();
+        }
+        catch (Exception)
+        {
+            HasCxpBoard = false;
+        }
+    }
+
+    /// <summary>
+    /// One start for everything this PC has: packet capture, plus CXP watching when the grabber is
+    /// there. CXP starts first so it still runs when pktmon refuses.
+    /// </summary>
     [RelayCommand]
     private void StartCapture()
     {
+        if (HasCxpBoard) StartCxp();
         if (IsCapturing) return;
         CaptureError = string.Empty;
         _context = new DissectorContext { McPortMin = _settings.McPortMin, McPortMax = _settings.McPortMax };
@@ -160,7 +183,7 @@ public sealed partial class WiresharkViewModel : ObservableObject, IDisposable
         source.Faulted += message => _dispatcher.BeginInvoke(() =>
         {
             CaptureError = "캡처 중단: " + message;
-            StopCapture();
+            StopPackets();
         });
         try
         {
@@ -179,6 +202,12 @@ public sealed partial class WiresharkViewModel : ObservableObject, IDisposable
 
     [RelayCommand]
     private void StopCapture()
+    {
+        StopPackets();
+        StopCxp();
+    }
+
+    private void StopPackets()
     {
         _capture?.Dispose();
         _capture = null;
