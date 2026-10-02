@@ -88,4 +88,24 @@ internal static class TestFrames
     public static byte[] McOkResponse4E(ushort serial)
         => new byte[] { 0xD4, 0x00, (byte)serial, (byte)(serial >> 8), 0x00, 0x00 }
             .Concat(McOkResponse3E.Skip(2)).ToArray();
+
+    /// <summary>AMS/TCP header + AMS header (+ 4-byte ADS result on responses).</summary>
+    public static byte[] Ads(ushort command, bool response, uint invokeId, uint error = 0, uint result = 0)
+    {
+        int data = response ? 4 : 0;
+        var p = new byte[6 + 32 + data];
+        BinaryPrimitives.WriteUInt32LittleEndian(p.AsSpan(2), (uint)(32 + data));
+        byte[] target = { 5, 1, 2, 3, 1, 1 }, source = { 192, 168, 0, 2, 1, 1 };
+        (response ? source : target).CopyTo(p, 6);
+        BinaryPrimitives.WriteUInt16LittleEndian(p.AsSpan(12), (ushort)(response ? 30000 : 851));
+        (response ? target : source).CopyTo(p, 14);
+        BinaryPrimitives.WriteUInt16LittleEndian(p.AsSpan(20), (ushort)(response ? 851 : 30000));
+        BinaryPrimitives.WriteUInt16LittleEndian(p.AsSpan(22), command);
+        BinaryPrimitives.WriteUInt16LittleEndian(p.AsSpan(24), (ushort)(response ? 0x0005 : 0x0004));
+        BinaryPrimitives.WriteUInt32LittleEndian(p.AsSpan(26), (uint)data);
+        BinaryPrimitives.WriteUInt32LittleEndian(p.AsSpan(30), error);
+        BinaryPrimitives.WriteUInt32LittleEndian(p.AsSpan(34), invokeId);
+        if (response) BinaryPrimitives.WriteUInt32LittleEndian(p.AsSpan(38), result);
+        return p;
+    }
 }

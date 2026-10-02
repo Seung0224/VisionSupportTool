@@ -159,7 +159,10 @@ public static class FrameDissector
         {
             McDissector.TryDissect(payload, payloadAt, packet);
         }
-        // ADS is wired in by Task 6.
+        else if (dp == context.AdsPort || sp == context.AdsPort)
+        {
+            AdsDissector.TryDissect(payload, payloadAt, packet);
+        }
     }
 
     private static void DissectUdp(Packet packet, int at, DissectorContext context)
