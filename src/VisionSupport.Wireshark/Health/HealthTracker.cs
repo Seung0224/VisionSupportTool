@@ -36,7 +36,7 @@ public sealed partial class HealthTracker
         TargetKind.Mc => "PLC(MC)",
         TargetKind.Ads => "PLC(ADS)",
         TargetKind.GigE => "카메라(GigE)",
-        TargetKind.Nic => "네트워크",
+        TargetKind.Nic => "랜카드",
         TargetKind.Cxp => "카메라(CXP)",
         _ => kind.ToString(),
     };
@@ -203,8 +203,11 @@ public sealed partial class HealthTracker
         }
         if (p.App is { Kind: AppKind.Gvcp } gvcp)
         {
-            var camera = gvcp.Role == MessageRole.Request ? p.DstIp : p.SrcIp;
-            return camera is null ? null : GetOrAdd(camera.ToString(), TargetKind.GigE);
+            // A command may go to a broadcast address ("any camera out there?"), so only a host
+            // that answers becomes a camera card; commands just reach cameras already known.
+            return gvcp.Role == MessageRole.Request
+                ? p.DstIp is null ? null : Find(p.DstIp.ToString())
+                : p.SrcIp is null ? null : GetOrAdd(p.SrcIp.ToString(), TargetKind.GigE);
         }
         if (p.Gvsp is not null && p.SrcIp is not null) return GetOrAdd(p.SrcIp.ToString(), TargetKind.GigE);
         if (p.Tcp is { } t && p.SrcIp is not null && p.DstIp is not null)
@@ -316,6 +319,7 @@ public sealed partial class HealthTracker
             _ when t.LastWarnEvent is { } w && now - w < recovery => (HealthLevel.Warn, t.LastWarnText),
             _ when t.StatusOverride is { } o => o,
             _ when t.LastSeen is null => (HealthLevel.Idle, "트래픽 없음"),
+            _ when t.Kind == TargetKind.Nic => (HealthLevel.Ok, "연결됨"),
             _ => (HealthLevel.Ok, t.LastResponseMs is { } ms ? $"정상 · 응답 {ms:0}ms" : "정상"),
         };
 

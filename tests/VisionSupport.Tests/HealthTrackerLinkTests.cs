@@ -122,6 +122,42 @@ public class HealthTrackerLinkTests
         Assert.Equal(0, Target(TestFrames.Camera).DropCount);
     }
 
+    /// <summary>"Any GigE camera out there?" goes to a broadcast address; only a camera that answers is a camera.</summary>
+    [Theory]
+    [InlineData("255.255.255.255")]
+    [InlineData("192.168.130.255")]
+    public void A_discovery_broadcast_is_not_a_camera(string broadcast)
+    {
+        var discovery = new byte[8];
+        discovery[0] = 0x42;
+        discovery[3] = 0x02; // DISCOVERY_CMD
+        Send(TestFrames.Udp(TestFrames.Host, 50001, broadcast, 3956, discovery));
+        _tracker.Tick();
+
+        Assert.Empty(_tracker.Snapshot());
+    }
+
+    [Fact]
+    public void A_camera_that_answers_becomes_a_card()
+    {
+        LearnCamera();
+        _tracker.Tick();
+
+        Assert.Equal(TargetKind.GigE, Assert.Single(_tracker.Snapshot()).Kind);
+    }
+
+    /// <summary>The NIC card is this PC's own network port - its Windows name may well be "PLC".</summary>
+    [Fact]
+    public void The_nic_card_says_it_is_a_network_port_and_whether_it_is_connected()
+    {
+        _tracker.ReportLink("00-11-22-33-44-55", "PLC", up: true);
+        _tracker.Tick();
+
+        TargetSnapshot nic = Target("00-11-22-33-44-55");
+        Assert.Equal("랜카드 PLC", nic.Name);
+        Assert.Equal("연결됨", nic.Summary);
+    }
+
     /// <summary>On a running line the capture almost always starts in the middle of a frame.</summary>
     [Fact]
     public void Starting_the_capture_mid_frame_is_not_a_drop()
