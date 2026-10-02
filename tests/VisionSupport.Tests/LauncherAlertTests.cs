@@ -6,8 +6,18 @@ using Xunit;
 
 namespace VisionSupport.Tests;
 
+/// <summary>
+/// Runs on the shared STA dispatcher: once any test has created the process's Application,
+/// <see cref="FeatureModule"/> posts Changed to that dispatcher, so asserting from another thread
+/// would race the post.
+/// </summary>
+[Collection(StaAppCollection.Name)]
 public class LauncherAlertTests
 {
+    private readonly StaAppFixture _app;
+
+    public LauncherAlertTests(StaAppFixture app) => _app = app;
+
     private sealed class AlertingFeature : FeatureModule
     {
         public bool Alert { get; set; }
@@ -28,7 +38,7 @@ public class LauncherAlertTests
     }
 
     [Fact]
-    public void A_tool_raising_an_alert_turns_the_launcher_ring_red()
+    public void A_tool_raising_an_alert_turns_the_launcher_ring_red() => _app.Run(() =>
     {
         var tool = new AlertingFeature();
         LauncherViewModel launcher = LauncherWith(tool);
@@ -41,7 +51,7 @@ public class LauncherAlertTests
 
         Assert.True(launcher.AnyAlert);
         Assert.Contains(nameof(LauncherViewModel.AnyAlert), raised);
-    }
+    });
 
     [Fact]
     public void Features_that_never_alert_default_to_false()

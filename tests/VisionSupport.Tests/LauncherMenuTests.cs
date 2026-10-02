@@ -11,8 +11,15 @@ namespace VisionSupport.Tests;
 /// What the V opens onto. The memory monitor and the PLC server share one tile and a box of their
 /// own.
 /// </summary>
+/// Runs on the shared STA dispatcher: once any test has created the process's Application,
+/// FeatureModule posts Changed to that dispatcher, so asserting from another thread races the post.
+[Collection(StaAppCollection.Name)]
 public class LauncherMenuTests
 {
+    private readonly StaAppFixture _app;
+
+    public LauncherMenuTests(StaAppFixture app) => _app = app;
+
     [Fact]
     public void Memory_monitor_and_plc_share_one_tile()
     {
@@ -24,7 +31,7 @@ public class LauncherMenuTests
     }
 
     [Fact]
-    public void The_tools_tile_is_ringed_while_a_tool_inside_is_working()
+    public void The_tools_tile_is_ringed_while_a_tool_inside_is_working() => _app.Run(() =>
     {
         var idle = new SwitchableFeature();
         var busy = new SwitchableFeature();
@@ -38,7 +45,7 @@ public class LauncherMenuTests
 
         Assert.True(tools.IsRunning);
         Assert.Contains(nameof(LauncherItem.IsRunning), raised);
-    }
+    });
 
     private static LauncherViewModel Create(IFeatureModule firstTool, IFeatureModule secondTool)
     {
