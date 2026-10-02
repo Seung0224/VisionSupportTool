@@ -311,6 +311,10 @@
             <Ellipse Stroke="{StaticResource StateRunning}" StrokeThickness="2.5" Margin="1"
                      Visibility="{Binding AnyRunning, Converter={StaticResource BoolToVis}}"/>
 
+            <!-- Drawn over the green ring, so "something is wrong" wins over "something is up". -->
+            <Ellipse Stroke="{StaticResource StateFaulted}" StrokeThickness="2.5" Margin="1"
+                     Visibility="{Binding AnyAlert, Converter={StaticResource BoolToVis}}"/>
+
             <!-- VISION's V. Rotating it to a caret on expand is the open/close affordance; it is
                  also the only moving part that tells you the menu heard the click. -->
             <!-- A ring that fills as a job runs, drawn as an arc's worth of stroke. Reading a

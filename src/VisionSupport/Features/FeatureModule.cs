@@ -38,6 +38,8 @@ public abstract class FeatureModule : IFeatureModule
 
     public abstract bool IsWorking { get; }
 
+    public virtual bool HasAlert => false;
+
     public virtual string? CloseBlockedReason => null;
 
     public FeatureState State

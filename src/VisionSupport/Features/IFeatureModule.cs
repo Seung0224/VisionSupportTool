@@ -73,6 +73,13 @@ public interface IFeatureModule
     bool IsWorking { get; }
 
     /// <summary>
+    /// Whether the feature has seen something the user should look at - a PLC that stopped
+    /// answering, a camera dropping frames. Drives the red ring on the launcher icon, which has to
+    /// say so even with every window closed. Changes are announced through <see cref="Changed"/>.
+    /// </summary>
+    bool HasAlert { get; }
+
+    /// <summary>
     /// Why the feature's window must not close right now, or null when it may. Set while the tool
     /// is in the middle of something that can neither carry on without its window nor be cut off
     /// safely - an image batch half written to disk. The window shows this instead of closing,

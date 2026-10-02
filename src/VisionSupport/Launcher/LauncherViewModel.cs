@@ -194,6 +194,9 @@ public sealed partial class LauncherViewModel : ObservableObject
     /// <summary>Drives the ring around the icon: something is up even with every window closed.</summary>
     public bool AnyRunning => _modules.Any(m => m.IsWorking);
 
+    /// <summary>Drives the red ring: some feature wants attention, even with every window closed.</summary>
+    public bool AnyAlert => _modules.Any(m => m.HasAlert);
+
     [RelayCommand]
     public void ShowOverview()
     {
@@ -414,6 +417,7 @@ public sealed partial class LauncherViewModel : ObservableObject
     private void OnModuleChanged(object? sender, EventArgs e)
     {
         OnPropertyChanged(nameof(AnyRunning));
+        OnPropertyChanged(nameof(AnyAlert));
         _toolsItem?.RefreshRunning();
 
         if (sender is FeatureModule { State: FeatureState.Faulted } faulted)
