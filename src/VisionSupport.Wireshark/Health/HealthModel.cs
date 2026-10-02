@@ -3,7 +3,8 @@ namespace VisionSupport.Wireshark.Health;
 /// <summary>Card colour: grey, green, yellow, red.</summary>
 public enum HealthLevel { Idle, Ok, Warn, Bad }
 
-public enum TargetKind { Mc, Ads, GigE, Nic, Cxp }
+/// <summary>Host is any other peer the port talks to - so an ordinary port still has a list.</summary>
+public enum TargetKind { Mc, Ads, GigE, Nic, Cxp, Host }
 
 public enum AnomalyKind
 {
@@ -14,8 +15,9 @@ public enum AnomalyKind
 public sealed record Anomaly(DateTime Time, string TargetId, string TargetName, AnomalyKind Kind,
     HealthLevel Severity, string Text, long? PacketNumber);
 
+/// <param name="Detail">What it is or talks: "PLC (MC)", "TCP 443".</param>
 public sealed record TargetSnapshot(string Id, TargetKind Kind, string Name, bool Pinned, HealthLevel Level,
-    string Summary, long DropCount, double? LastResponseMs, long Bytes);
+    string Summary, long DropCount, double? LastResponseMs, long Bytes, string Detail = "");
 
 /// <summary>Spec §5 defaults. Settable so settings.json can tune them per line.</summary>
 public sealed class HealthThresholds

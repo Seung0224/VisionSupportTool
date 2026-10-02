@@ -82,4 +82,22 @@ public class WiresharkViewModelPartsTests
     [InlineData(TargetKind.Cxp, "카메라 (CXP)")]
     public void A_card_names_what_kind_of_device_it_is(TargetKind kind, string label)
         => Assert.Equal(label, new TargetCardViewModel("x", kind).KindLabel);
+
+    [Theory]
+    [InlineData(0, "0 B/s")]
+    [InlineData(850, "850 B/s")]
+    [InlineData(1536, "1.5 KB/s")]
+    [InlineData(3_400_000, "3.2 MB/s")]
+    public void Rates_read_like_a_network_meter(double bytesPerSecond, string text)
+        => Assert.Equal(text, TargetCardViewModel.FormatRate(bytesPerSecond));
+
+    [Fact]
+    public void A_peer_row_shows_what_it_talks()
+    {
+        var card = new TargetCardViewModel("142.250.1.1", TargetKind.Host);
+        card.Update(new TargetSnapshot("142.250.1.1", TargetKind.Host, "142.250.1.1", false, HealthLevel.Ok, "정상", 0, null, 0, "TCP 443"));
+
+        Assert.Equal("TCP 443", card.Detail);
+        Assert.True(card.CanPin);
+    }
 }

@@ -36,6 +36,14 @@ public static class NicCatalog
             .ToList();
     }
 
+    /// <summary>This PC's own IPv4 addresses, on every adapter. Needs no elevation.</summary>
+    public static IReadOnlyList<System.Net.IPAddress> LocalAddresses()
+        => NetworkInterface.GetAllNetworkInterfaces()
+            .SelectMany(n => n.GetIPProperties().UnicastAddresses)
+            .Select(a => a.Address)
+            .Where(a => a.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork)
+            .ToList();
+
     public static bool? IsUp(string mac)
         => Adapters().TryGetValue(mac, out NetworkInterface? n) ? n.OperationalStatus == OperationalStatus.Up : null;
 

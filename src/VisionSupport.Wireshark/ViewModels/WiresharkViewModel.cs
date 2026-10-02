@@ -66,6 +66,14 @@ public sealed partial class WiresharkViewModel : ObservableObject, IDisposable
         _cxpPresence = cxpPresence ?? (() => RapixoPresence.Query(_settings.CxpDeviceNameMatch).Present);
         _dispatcher = Dispatcher.CurrentDispatcher;
         _health = new HealthTracker(_settings.Thresholds, clock);
+        try
+        {
+            _health.SetLocalAddresses(NicCatalog.LocalAddresses());
+        }
+        catch (System.Net.NetworkInformation.NetworkInformationException)
+        {
+            // Without our own addresses the peer list stays empty; devices are still found.
+        }
         foreach (PinnedTarget p in _settings.Pinned) _health.Pin(p.Id, p.Kind, p.Name);
         _packets = new PacketStore(_settings.StoreMaxBytes, _settings.StoreMaxCount);
 
@@ -126,8 +134,12 @@ public sealed partial class WiresharkViewModel : ObservableObject, IDisposable
     /// <summary>Raised once a second after the chart data moved.</summary>
     public event EventHandler? ChartUpdated;
 
+    /// <summary>"PLC 연결의 상대": the list is everything the chosen connection talks to.</summary>
+    public string PeerHeader => SelectedNic is { } nic ? $"{nic.Name} 연결의 상대" : "모든 연결의 상대";
+
     partial void OnSelectedNicChanged(NicInfo? value)
     {
+        OnPropertyChanged(nameof(PeerHeader));
         _nicFilter = value?.ComponentId ?? -1;
         _settings.LastNicComponentId = value?.ComponentId;
     }
@@ -481,6 +493,7 @@ public sealed partial class WiresharkViewModel : ObservableObject, IDisposable
             }
             long previous = _lastBytes.GetValueOrDefault(s.Id, s.Bytes);
             history.Add(now, s.Bytes - previous, s.LastResponseMs);
+            card.Rate = TargetCardViewModel.FormatRate(s.Bytes - previous);
             _lastBytes[s.Id] = s.Bytes;
         }
 
@@ -502,7 +515,7 @@ public sealed partial class WiresharkViewModel : ObservableObject, IDisposable
     {
         (false, _) => "감시를 시작하면 PLC 와 카메라가 여기 나타납니다.",
         (true, 0) => "패킷을 기다리는 중입니다…",
-        _ => $"패킷 {packets:N0}개를 받았지만 PLC(MC·ADS)·GigE 카메라 통신은 아직 보이지 않습니다. 인터페이스가 맞는지 확인하세요.",
+        _ => $"패킷 {packets:N0}개를 받았지만 주고받은 상대가 없습니다 (방송·그룹 주소만 오갔습니다).",
     };
 
     private HealthLevel? _portLevel;

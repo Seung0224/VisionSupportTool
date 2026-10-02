@@ -13,6 +13,9 @@ public sealed partial class HealthTracker
 {
     private const int MaxPending = 256;
 
+    /// <summary>A busy internet port meets thousands of peers; the quietest unpinned ones go first.</summary>
+    public const int MaxPeers = 300;
+
     private readonly object _gate = new();
     private readonly Dictionary<string, TargetState> _targets = new();
     private readonly List<Anomaly> _raised = new();
@@ -22,6 +25,9 @@ public sealed partial class HealthTracker
 
     /// <summary>False while the capture is stopped: silence then means nothing about the target.</summary>
     private bool _listening = true;
+
+    /// <summary>This PC's own addresses: the other end of a packet is the peer.</summary>
+    private HashSet<System.Net.IPAddress> _local = new();
 
     public HealthTracker(HealthThresholds thresholds, TimeProvider clock)
     {
@@ -38,6 +44,7 @@ public sealed partial class HealthTracker
         TargetKind.GigE => "카메라 (GigE)",
         TargetKind.Nic => "랜카드",
         TargetKind.Cxp => "카메라 (CXP)",
+        TargetKind.Host => "일반",
         _ => kind.ToString(),
     };
 
@@ -79,6 +86,11 @@ public sealed partial class HealthTracker
                 t.SilenceReported = false;
             }
         }
+    }
+
+    public void SetLocalAddresses(IEnumerable<System.Net.IPAddress> addresses)
+    {
+        lock (_gate) _local = addresses.ToHashSet();
     }
 
     public void StartListening()
@@ -140,10 +152,14 @@ public sealed partial class HealthTracker
     {
         lock (_gate)
         {
+            // Watched first, then PLCs and cameras, then everyone else by how much they carry.
             return _targets.Values
-                .OrderByDescending(t => t.Pinned).ThenBy(t => t.Kind).ThenBy(t => t.Id, StringComparer.Ordinal)
+                .OrderByDescending(t => t.Pinned)
+                .ThenBy(t => t.Kind == TargetKind.Host)
+                .ThenByDescending(t => t.Bytes)
+                .ThenBy(t => t.Id, StringComparer.Ordinal)
                 .Select(t => new TargetSnapshot(t.Id, t.Kind, t.Name, t.Pinned, t.Level, t.Summary,
-                    t.DropCount, t.LastResponseMs, t.Bytes))
+                    t.DropCount, t.LastResponseMs, t.Bytes, t.Detail))
                 .ToList();
         }
     }
@@ -186,7 +202,7 @@ public sealed partial class HealthTracker
     {
         if (!_targets.TryGetValue(id, out TargetState? t))
         {
-            t = new TargetState(id, kind, name ?? id);
+            t = new TargetState(id, kind, name ?? id) { Detail = KindLabel(kind) };
             _targets.Add(id, t);
         }
         return t;
@@ -215,11 +231,44 @@ public sealed partial class HealthTracker
         {
             return GetOrAdd(p.SrcIp.ToString(), TargetKind.GigE, DeviceName(p, p.SrcIp));
         }
-        if (p.Tcp is { } t && p.SrcIp is not null && p.DstIp is not null)
+        if (p.Tcp is { } t && p.SrcIp is not null && p.DstIp is not null
+            && (Find($"{p.DstIp}:{t.DstPort}") ?? Find($"{p.SrcIp}:{t.SrcPort}")) is { } device)
         {
-            return Find($"{p.DstIp}:{t.DstPort}") ?? Find($"{p.SrcIp}:{t.SrcPort}");
+            return device;
         }
-        return null;
+        return ResolvePeer(p);
+    }
+
+    /// <summary>Anything else: the other end of the packet, unless that is a broadcast or group address.</summary>
+    private TargetState? ResolvePeer(Packet p)
+    {
+        if (_local.Count == 0 || p.SrcIp is null || p.DstIp is null) return null;
+
+        bool outgoing = _local.Contains(p.SrcIp);
+        System.Net.IPAddress? peer = outgoing ? p.DstIp : _local.Contains(p.DstIp) ? p.SrcIp : null;
+        if (peer is null || IsGroupAddress(peer)) return null;
+
+        string id = peer.ToString();
+        if (!_targets.ContainsKey(id)) EvictQuietestPeer();
+        TargetState target = GetOrAdd(id, TargetKind.Host, id);
+        int? port = p.Tcp is { } tcp ? (outgoing ? tcp.DstPort : tcp.SrcPort)
+            : p.Udp is { } udp ? (outgoing ? udp.DstPort : udp.SrcPort) : null;
+        target.Detail = port is { } n ? $"{(p.Tcp is not null ? "TCP" : "UDP")} {n}" : p.Protocol;
+        return target;
+    }
+
+    private static bool IsGroupAddress(System.Net.IPAddress address)
+    {
+        byte[] b = address.GetAddressBytes();
+        return b.Length != 4 || b[3] == 255 || b[0] >= 224 || b[0] == 0;
+    }
+
+    private void EvictQuietestPeer()
+    {
+        List<TargetState> peers = _targets.Values.Where(t => t.Kind == TargetKind.Host).ToList();
+        if (peers.Count < MaxPeers) return;
+        TargetState? quietest = peers.Where(t => !t.Pinned).MinBy(t => t.LastSeen ?? DateTime.MinValue);
+        if (quietest is not null) _targets.Remove(quietest.Id);
     }
 
     /// <summary>"PLC 연결 · 192.168.0.10": which of the user's connections, then which device on it.</summary>
@@ -379,6 +428,7 @@ public sealed partial class HealthTracker
         public string Id { get; }
         public TargetKind Kind { get; }
         public string Name { get; set; }
+        public string Detail { get; set; } = string.Empty;
         public bool Pinned { get; set; }
         /// <summary>Counts toward the launcher alert: pinned, or the machine's own NIC/board.</summary>
         public bool Watched => Pinned || Kind is TargetKind.Nic or TargetKind.Cxp;

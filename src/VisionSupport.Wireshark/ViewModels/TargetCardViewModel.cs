@@ -27,6 +27,12 @@ public sealed partial class TargetCardViewModel : ObservableObject
     [ObservableProperty] private bool _pinned;
     [ObservableProperty] private long _dropCount;
 
+    /// <summary>What the device is or what the peer talks: "PLC (MC)", "TCP 443".</summary>
+    [ObservableProperty] private string _detail = string.Empty;
+
+    /// <summary>Traffic over the last second, as a network meter would show it.</summary>
+    [ObservableProperty] private string _rate = FormatRate(0);
+
     /// <summary>The card whose graph and packets are on screen.</summary>
     [ObservableProperty] private bool _isSelected;
 
@@ -37,5 +43,13 @@ public sealed partial class TargetCardViewModel : ObservableObject
         Summary = s.Summary;
         Pinned = s.Pinned;
         DropCount = s.DropCount;
+        Detail = s.Detail;
     }
+
+    public static string FormatRate(double bytesPerSecond) => bytesPerSecond switch
+    {
+        >= 1024 * 1024 => $"{bytesPerSecond / (1024 * 1024):0.0} MB/s",
+        >= 1024 => $"{bytesPerSecond / 1024:0.0} KB/s",
+        _ => $"{bytesPerSecond:0} B/s",
+    };
 }

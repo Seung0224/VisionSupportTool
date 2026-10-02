@@ -113,14 +113,16 @@ public sealed partial class HealthTracker
                 Raise(target, AnomalyKind.Retransmit, HealthLevel.Warn, $"재전송 {target.Retransmits.Count}회 (최근 1분)", packet.Number);
             }
         }
-        if ((verdict & (TcpVerdict.Reset | TcpVerdict.Fin)) != 0)
+        // An unwatched internet peer resets and closes connections as a matter of course.
+        bool ordinaryPeer = target.Kind == TargetKind.Host && !target.Pinned;
+        if ((verdict & (TcpVerdict.Reset | TcpVerdict.Fin)) != 0 && !ordinaryPeer)
         {
             packet.IsAnomalous = true;
             target.ForgetClient(packet.Source == target.Id ? packet.Destination : packet.Source);
             Raise(target, AnomalyKind.ConnectionClosed, HealthLevel.Bad,
                 verdict.HasFlag(TcpVerdict.Reset) ? "연결 리셋(RST)" : "연결 종료(FIN)", packet.Number);
         }
-        if (verdict.HasFlag(TcpVerdict.ZeroWindow))
+        if (verdict.HasFlag(TcpVerdict.ZeroWindow) && !ordinaryPeer)
         {
             packet.IsAnomalous = true;
             Raise(target, AnomalyKind.ZeroWindow, HealthLevel.Warn, "수신 버퍼 가득 참(제로 윈도우)", packet.Number);
