@@ -28,7 +28,7 @@ public sealed partial class HealthTracker
         lock (_gate)
         {
             TargetState t = GetOrAdd(nicId, TargetKind.Nic);
-            t.Name = $"{KindLabel(TargetKind.Nic)} {name}";
+            t.Name = name;
             t.LastSeen = Now;
             if (!up && !t.LinkDown)
             {
@@ -53,7 +53,7 @@ public sealed partial class HealthTracker
         lock (_gate)
         {
             TargetState t = GetOrAdd(report.BoardId, TargetKind.Cxp);
-            t.Name = $"{KindLabel(TargetKind.Cxp)} {report.BoardName}";
+            t.Name = $"CXP 보드 · {report.BoardName}";
             t.LastSeen = Now;
 
             switch (report.Mode)

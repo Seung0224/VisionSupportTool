@@ -154,7 +154,7 @@ public class HealthTrackerLinkTests
         _tracker.Tick();
 
         TargetSnapshot nic = Target("00-11-22-33-44-55");
-        Assert.Equal("랜카드 PLC", nic.Name);
+        Assert.Equal("PLC", nic.Name);
         Assert.Equal("연결됨", nic.Summary);
     }
 

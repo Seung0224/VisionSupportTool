@@ -33,11 +33,11 @@ public sealed partial class HealthTracker
 
     public static string KindLabel(TargetKind kind) => kind switch
     {
-        TargetKind.Mc => "PLC(MC)",
-        TargetKind.Ads => "PLC(ADS)",
-        TargetKind.GigE => "카메라(GigE)",
+        TargetKind.Mc => "PLC (MC)",
+        TargetKind.Ads => "PLC (ADS)",
+        TargetKind.GigE => "카메라 (GigE)",
         TargetKind.Nic => "랜카드",
-        TargetKind.Cxp => "카메라(CXP)",
+        TargetKind.Cxp => "카메라 (CXP)",
         _ => kind.ToString(),
     };
 
@@ -182,11 +182,11 @@ public sealed partial class HealthTracker
         return x > y ? x : y;
     }
 
-    private TargetState GetOrAdd(string id, TargetKind kind)
+    private TargetState GetOrAdd(string id, TargetKind kind, string? name = null)
     {
         if (!_targets.TryGetValue(id, out TargetState? t))
         {
-            t = new TargetState(id, kind, $"{KindLabel(kind)} {id}");
+            t = new TargetState(id, kind, name ?? id);
             _targets.Add(id, t);
         }
         return t;
@@ -198,8 +198,10 @@ public sealed partial class HealthTracker
     {
         if (p.App is { Kind: AppKind.Mc or AppKind.Ads } app && p.Tcp is { } tcp)
         {
-            string id = app.Role == MessageRole.Request ? $"{p.DstIp}:{tcp.DstPort}" : $"{p.SrcIp}:{tcp.SrcPort}";
-            return GetOrAdd(id, app.Kind == AppKind.Mc ? TargetKind.Mc : TargetKind.Ads);
+            bool toPlc = app.Role == MessageRole.Request;
+            string id = toPlc ? $"{p.DstIp}:{tcp.DstPort}" : $"{p.SrcIp}:{tcp.SrcPort}";
+            return GetOrAdd(id, app.Kind == AppKind.Mc ? TargetKind.Mc : TargetKind.Ads,
+                DeviceName(p, toPlc ? p.DstIp : p.SrcIp));
         }
         if (p.App is { Kind: AppKind.Gvcp } gvcp)
         {
@@ -207,15 +209,22 @@ public sealed partial class HealthTracker
             // that answers becomes a camera card; commands just reach cameras already known.
             return gvcp.Role == MessageRole.Request
                 ? p.DstIp is null ? null : Find(p.DstIp.ToString())
-                : p.SrcIp is null ? null : GetOrAdd(p.SrcIp.ToString(), TargetKind.GigE);
+                : p.SrcIp is null ? null : GetOrAdd(p.SrcIp.ToString(), TargetKind.GigE, DeviceName(p, p.SrcIp));
         }
-        if (p.Gvsp is not null && p.SrcIp is not null) return GetOrAdd(p.SrcIp.ToString(), TargetKind.GigE);
+        if (p.Gvsp is not null && p.SrcIp is not null)
+        {
+            return GetOrAdd(p.SrcIp.ToString(), TargetKind.GigE, DeviceName(p, p.SrcIp));
+        }
         if (p.Tcp is { } t && p.SrcIp is not null && p.DstIp is not null)
         {
             return Find($"{p.DstIp}:{t.DstPort}") ?? Find($"{p.SrcIp}:{t.SrcPort}");
         }
         return null;
     }
+
+    /// <summary>"PLC 연결 · 192.168.0.10": which of the user's connections, then which device on it.</summary>
+    private static string DeviceName(Packet p, System.Net.IPAddress? host)
+        => p.Interface is { Length: > 0 } nic ? $"{nic} 연결 · {host}" : $"{host}";
 
     private void TrackMessage(TargetState target, Packet packet, AppMessage app)
     {

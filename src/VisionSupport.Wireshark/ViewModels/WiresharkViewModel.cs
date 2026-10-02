@@ -51,6 +51,7 @@ public sealed partial class WiresharkViewModel : ObservableObject, IDisposable
     private volatile int _nicFilter = -1;
     private long _nextNumber;
     private long _capturedBytes;
+    private volatile IReadOnlyDictionary<int, string> _nicNames = new Dictionary<int, string>();
     private bool _disposed;
 
     public WiresharkViewModel() : this(WiresharkSettingsStore.Default, TimeProvider.System)
@@ -98,6 +99,10 @@ public sealed partial class WiresharkViewModel : ObservableObject, IDisposable
     [ObservableProperty] private string _captureError = string.Empty;
     [ObservableProperty] private string _cxpMessage = string.Empty;
 
+    /// <summary>The selected port's own state, shown beside the interface picker: "연결됨" / "끊김".</summary>
+    [ObservableProperty] private string _linkText = string.Empty;
+    [ObservableProperty] private HealthLevel _linkLevel;
+
     /// <summary>Whether any PLC or camera card exists; without one the card row explains why.</summary>
     [ObservableProperty] private bool _hasDeviceCards;
     [ObservableProperty] private string _noDevicesText = DescribeNoDevices(false, 0);
@@ -110,6 +115,11 @@ public sealed partial class WiresharkViewModel : ObservableObject, IDisposable
     [ObservableProperty] private string _overallText = "감시 대상 없음";
 
     public bool IsWorking => IsCapturing || IsCxpWatching;
+
+    /// <summary>For tests: the tracker behind the cards, and one tick on demand.</summary>
+    internal HealthTracker Health => _health;
+
+    internal void Refresh() => OnTick();
 
     public ChartHistory? FocusedHistory => FocusedCard is { } c ? _history.GetValueOrDefault(c.Id) : null;
 
@@ -143,7 +153,23 @@ public sealed partial class WiresharkViewModel : ObservableObject, IDisposable
         SelectedPacket = Rows.FirstOrDefault(p => p.Number == number);
     }
 
-    partial void OnFocusedCardChanged(TargetCardViewModel? value) => OnPropertyChanged(nameof(FocusedHistory));
+    /// <summary>
+    /// Selecting a card is the one way to look at a device: it is marked, the list narrows to its
+    /// packets (the NIC and CXP cards are the whole port, so they show everything), and the chart
+    /// follows it.
+    /// </summary>
+    partial void OnFocusedCardChanged(TargetCardViewModel? oldValue, TargetCardViewModel? newValue)
+    {
+        if (oldValue is not null) oldValue.IsSelected = false;
+        if (newValue is not null)
+        {
+            newValue.IsSelected = true;
+            FilterText = newValue.CanPin ? "id:" + newValue.Id : string.Empty;
+            SelectedPacket = Rows.LastOrDefault(p => p.IsAnomalous) ?? Rows.LastOrDefault();
+        }
+        OnPropertyChanged(nameof(FocusedHistory));
+        ChartUpdated?.Invoke(this, EventArgs.Empty);
+    }
 
     [RelayCommand]
     private void RefreshNics()
@@ -152,6 +178,7 @@ public sealed partial class WiresharkViewModel : ObservableObject, IDisposable
         {
             Nics.Clear();
             foreach (NicInfo nic in NicCatalog.Query()) Nics.Add(nic);
+            _nicNames = Nics.ToDictionary(n => n.ComponentId, n => n.Name);
             SelectedNic = Nics.FirstOrDefault(n => n.ComponentId == _settings.LastNicComponentId);
         }
         catch (Exception ex) when (ex is InvalidOperationException or Win32Exception)
@@ -299,14 +326,7 @@ public sealed partial class WiresharkViewModel : ObservableObject, IDisposable
     }
 
     [RelayCommand]
-    private void FocusCard(TargetCardViewModel card)
-    {
-        FocusedCard = card;
-        // The NIC and CXP cards are the whole port, not one device: show everything.
-        FilterText = card.CanPin ? "id:" + card.Id : string.Empty;
-        SelectedPacket = Rows.LastOrDefault(p => p.IsAnomalous) ?? Rows.LastOrDefault();
-        ChartUpdated?.Invoke(this, EventArgs.Empty);
-    }
+    private void FocusCard(TargetCardViewModel card) => FocusedCard = card;
 
     [RelayCommand]
     private void ClearFilter()
@@ -362,6 +382,7 @@ public sealed partial class WiresharkViewModel : ObservableObject, IDisposable
         long number = Interlocked.Increment(ref _nextNumber);
         Interlocked.Add(ref _capturedBytes, frame.OriginalLength);
         Packet packet = FrameDissector.Dissect(number, frame.Time, frame.Data, frame.OriginalLength, _context);
+        packet.Interface = _nicNames.GetValueOrDefault(frame.ComponentId);
         _health.Observe(packet);
 
         // Spec §8: video payload is judged, not kept - except the packets that showed a problem.
@@ -425,7 +446,18 @@ public sealed partial class WiresharkViewModel : ObservableObject, IDisposable
     private void UpdateCards()
     {
         DateTime now = _clock.GetLocalNow().DateTime;
-        IReadOnlyList<TargetSnapshot> snapshots = _health.Snapshot();
+        IReadOnlyList<TargetSnapshot> all = _health.Snapshot();
+        // The port is not a device: it is shown beside the interface picker, not as a card.
+        TargetSnapshot? port = all.FirstOrDefault(s => s.Kind == TargetKind.Nic);
+        LinkLevel = port?.Level ?? HealthLevel.Idle;
+        LinkText = port?.Level switch
+        {
+            HealthLevel.Bad => "끊김",
+            HealthLevel.Ok => "연결됨",
+            _ => string.Empty,
+        };
+        _portLevel = port?.Level;
+        IReadOnlyList<TargetSnapshot> snapshots = all.Where(s => s.Kind != TargetKind.Nic).ToList();
         var seen = new HashSet<string>();
 
         for (int i = 0; i < snapshots.Count; i++)
@@ -473,13 +505,16 @@ public sealed partial class WiresharkViewModel : ObservableObject, IDisposable
         _ => $"패킷 {packets:N0}개를 받았지만 PLC(MC·ADS)·GigE 카메라 통신은 아직 보이지 않습니다. 인터페이스가 맞는지 확인하세요.",
     };
 
+    private HealthLevel? _portLevel;
+
     private void UpdateOverall()
     {
         HasDeviceCards = Cards.Any(c => c.CanPin);
         NoDevicesText = DescribeNoDevices(IsCapturing, Interlocked.Read(ref _nextNumber));
 
-        List<TargetCardViewModel> watched = Cards.Where(c => c.Pinned || !c.CanPin).ToList();
-        if (watched.Count == 0) watched = Cards.ToList();
+        List<HealthLevel> watched = Cards.Where(c => c.Pinned || !c.CanPin).Select(c => c.Level).ToList();
+        if (watched.Count == 0) watched = Cards.Select(c => c.Level).ToList();
+        if (_portLevel is { } portLevel) watched.Add(portLevel);
         if (watched.Count == 0)
         {
             OverallLevel = HealthLevel.Idle;
@@ -487,8 +522,8 @@ public sealed partial class WiresharkViewModel : ObservableObject, IDisposable
             return;
         }
 
-        HealthLevel worst = watched.Max(c => c.Level);
-        int count = watched.Count(c => c.Level == worst);
+        HealthLevel worst = watched.Max();
+        int count = watched.Count(l => l == worst);
         OverallLevel = worst;
         OverallText = worst switch
         {

@@ -74,4 +74,12 @@ public class WiresharkViewModelPartsTests
         Assert.True(card.CanPin);
         Assert.False(new TargetCardViewModel("nic", TargetKind.Nic).CanPin);
     }
+
+    [Theory]
+    [InlineData(TargetKind.Mc, "PLC (MC)")]
+    [InlineData(TargetKind.Ads, "PLC (ADS)")]
+    [InlineData(TargetKind.GigE, "카메라 (GigE)")]
+    [InlineData(TargetKind.Cxp, "카메라 (CXP)")]
+    public void A_card_names_what_kind_of_device_it_is(TargetKind kind, string label)
+        => Assert.Equal(label, new TargetCardViewModel("x", kind).KindLabel);
 }

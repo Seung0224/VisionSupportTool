@@ -77,6 +77,9 @@ public sealed class Packet
 
     public List<ProtocolNode> Layers { get; } = new();
 
+    /// <summary>Windows name of the NIC the frame came through ("PLC", "이더넷 2"), when known.</summary>
+    public string? Interface { get; set; }
+
     /// <summary>Which watched target this belongs to; set by the health tracker.</summary>
     public string? TargetId { get; set; }
 

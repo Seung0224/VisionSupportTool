@@ -15,6 +15,9 @@ public sealed partial class TargetCardViewModel : ObservableObject
 
     public TargetKind Kind { get; }
 
+    /// <summary>What the device is - the small tag on the card.</summary>
+    public string KindLabel => HealthTracker.KindLabel(Kind);
+
     /// <summary>The machine's own NIC and CXP board are always watched; there is nothing to pin.</summary>
     public bool CanPin => Kind is not (TargetKind.Nic or TargetKind.Cxp);
 
@@ -23,6 +26,9 @@ public sealed partial class TargetCardViewModel : ObservableObject
     [ObservableProperty] private string _summary = string.Empty;
     [ObservableProperty] private bool _pinned;
     [ObservableProperty] private long _dropCount;
+
+    /// <summary>The card whose graph and packets are on screen.</summary>
+    [ObservableProperty] private bool _isSelected;
 
     public void Update(TargetSnapshot s)
     {

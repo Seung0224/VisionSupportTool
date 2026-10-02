@@ -46,15 +46,6 @@ public partial class WiresharkView : UserControl, IDisposable
     /// <summary>Called by the feature when the window closes: the view model outlives this view.</summary>
     public void Dispose() => _viewModel.ChartUpdated -= OnChartUpdated;
 
-    private void OnCardClicked(object sender, MouseButtonEventArgs e)
-    {
-        if (e.OriginalSource is DependencyObject source && FindAncestor<Button>(source) is not null) return;
-        if ((sender as FrameworkElement)?.DataContext is TargetCardViewModel card)
-        {
-            _viewModel.FocusCardCommand.Execute(card);
-        }
-    }
-
     private void OnExport(object sender, RoutedEventArgs e)
     {
         var dialog = new SaveFileDialog
@@ -279,15 +270,6 @@ public partial class WiresharkView : UserControl, IDisposable
     {
         Crosshair.Visibility = Visibility.Collapsed;
         Readout.Visibility = Visibility.Collapsed;
-    }
-
-    private static T? FindAncestor<T>(DependencyObject node) where T : DependencyObject
-    {
-        for (DependencyObject? n = node; n is not null; n = System.Windows.Media.VisualTreeHelper.GetParent(n))
-        {
-            if (n is T match) return match;
-        }
-        return null;
     }
 
     /// <summary>

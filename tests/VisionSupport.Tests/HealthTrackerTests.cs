@@ -29,7 +29,7 @@ public class HealthTrackerTests
     private TargetSnapshot Plc0() => _tracker.Snapshot().Single(t => t.Id == Plc);
 
     [Fact]
-    public void Mc_traffic_creates_an_unpinned_candidate_named_after_the_plc()
+    public void Mc_traffic_creates_an_unpinned_candidate_named_after_the_device()
     {
         Request();
         _tracker.Tick();
@@ -37,7 +37,20 @@ public class HealthTrackerTests
         TargetSnapshot t = Plc0();
         Assert.Equal(TargetKind.Mc, t.Kind);
         Assert.False(t.Pinned);
-        Assert.Equal("PLC(MC) 192.168.0.10:5000", t.Name);
+        Assert.Equal("192.168.0.10", t.Name);
+    }
+
+    /// <summary>The name says which of the user's connections the device was found on.</summary>
+    [Fact]
+    public void A_device_is_named_after_the_connection_it_was_seen_on()
+    {
+        Packet p = TestFrames.Dissect(TestFrames.Tcp("192.168.0.2", 50000, "192.168.0.10", 5000, TestFrames.McReadRequest3E),
+            number: ++_number, time: _clock.Now);
+        p.Interface = "PLC";
+        _tracker.Observe(p);
+        _tracker.Tick();
+
+        Assert.Equal("PLC 연결 · 192.168.0.10", Plc0().Name);
     }
 
     [Fact]

@@ -126,4 +126,44 @@ public class WiresharkViewModelTests
     [InlineData(true, 8015, "패킷 8,015개를 받았지만 PLC(MC·ADS)·GigE 카메라 통신은 아직 보이지 않습니다. 인터페이스가 맞는지 확인하세요.")]
     public void The_card_area_says_why_it_is_empty(bool capturing, long packets, string expected)
         => Assert.Equal(expected, WiresharkViewModel.DescribeNoDevices(capturing, packets));
+
+    /// <summary>The port is not a device: its state sits next to the interface picker, not in the card row.</summary>
+    [Fact]
+    public void The_network_port_shows_beside_the_interface_not_as_a_card() => _app.Run(() =>
+    {
+        using var dir = new TempDir();
+        using var vm = new WiresharkViewModel(new WiresharkSettingsStore(Path.Combine(dir.Path, "s.json")), new ManualClock());
+
+        vm.Health.ReportLink("00-11-22-33-44-55", "PLC", up: false);
+        vm.Refresh();
+
+        Assert.Empty(vm.Cards);
+        Assert.Equal("끊김", vm.LinkText);
+        Assert.Equal(HealthLevel.Bad, vm.LinkLevel);
+        Assert.Equal(HealthLevel.Bad, vm.OverallLevel);
+    });
+
+    /// <summary>Exactly one card shows as selected, and "전체 보기" clears it.</summary>
+    [Fact]
+    public void Selecting_a_card_marks_only_that_card() => _app.Run(() =>
+    {
+        using var dir = new TempDir();
+        WiresharkSettingsStore store = StoreWithPinnedPlc(dir);
+        WiresharkSettings s = store.Load();
+        s.Pinned.Add(new PinnedTarget { Id = "192.168.0.11:5000", Kind = TargetKind.Mc, Name = "로더 PLC" });
+        store.Save(s);
+        using var vm = new WiresharkViewModel(store, new ManualClock());
+
+        vm.FocusedCard = vm.Cards[0];
+        vm.FocusedCard = vm.Cards[1];
+
+        Assert.False(vm.Cards[0].IsSelected);
+        Assert.True(vm.Cards[1].IsSelected);
+        Assert.Equal("id:" + vm.Cards[1].Id, vm.FilterText);
+
+        vm.ClearFilterCommand.Execute(null);
+
+        Assert.All(vm.Cards, c => Assert.False(c.IsSelected));
+        Assert.Equal(string.Empty, vm.FilterText);
+    });
 }
