@@ -67,4 +67,25 @@ internal static class TestFrames
         DateTime? time = null, int? originalLength = null)
         => FrameDissector.Dissect(number, time ?? T0, frame, originalLength ?? frame.Length,
             context ?? new DissectorContext());
+
+    // D100부터 10워드 일괄 읽기 (0401/0000), 3E 바이너리.
+    public static readonly byte[] McReadRequest3E =
+    {
+        0x50, 0x00, 0x00, 0xFF, 0xFF, 0x03, 0x00, 0x0C, 0x00, 0x10, 0x00,
+        0x01, 0x04, 0x00, 0x00, 0x64, 0x00, 0x00, 0xA8, 0x0A, 0x00,
+    };
+
+    public static readonly byte[] McOkResponse3E =
+        { 0xD0, 0x00, 0x00, 0xFF, 0xFF, 0x03, 0x00, 0x02, 0x00, 0x00, 0x00 };
+
+    public static readonly byte[] McErrorResponse3E =
+        { 0xD0, 0x00, 0x00, 0xFF, 0xFF, 0x03, 0x00, 0x02, 0x00, 0x59, 0xC0 };
+
+    public static byte[] McReadRequest4E(ushort serial)
+        => new byte[] { 0x54, 0x00, (byte)serial, (byte)(serial >> 8), 0x00, 0x00 }
+            .Concat(McReadRequest3E.Skip(2)).ToArray();
+
+    public static byte[] McOkResponse4E(ushort serial)
+        => new byte[] { 0xD4, 0x00, (byte)serial, (byte)(serial >> 8), 0x00, 0x00 }
+            .Concat(McOkResponse3E.Skip(2)).ToArray();
 }

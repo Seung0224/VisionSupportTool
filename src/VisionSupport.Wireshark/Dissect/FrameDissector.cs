@@ -155,10 +155,11 @@ public static class FrameDissector
         int payloadAt = at + headerLength;
         if (payloadLength == 0 || payloadAt >= f.Length) return;
         ReadOnlySpan<byte> payload = f.AsSpan(payloadAt);
-        // Application dissectors are wired in by later tasks:
-        // MC (Task 5), ADS (Task 6).
-        _ = payload;
-        _ = context;
+        if (context.IsMcPort(dp) || context.IsMcPort(sp))
+        {
+            McDissector.TryDissect(payload, payloadAt, packet);
+        }
+        // ADS is wired in by Task 6.
     }
 
     private static void DissectUdp(Packet packet, int at, DissectorContext context)
