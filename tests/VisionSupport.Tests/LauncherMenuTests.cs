@@ -25,7 +25,7 @@ public class LauncherMenuTests
     {
         LauncherViewModel launcher = Create(new MemoryMonitorFeature(), new PlcServerFeature());
 
-        Assert.Equal(new[] { "도구", "이미지 변환기", "누끼", "메일쓰기", "폴더", "전체보기" },
+        Assert.Equal(new[] { "도구", "이미지 변환기", "메일쓰기", "폴더", "전체보기" },
                      launcher.Items.Select(i => i.Title));
         Assert.Equal(new[] { "메모리 모니터", "PLC 서버" }, launcher.Tools.Select(i => i.Title));
     }

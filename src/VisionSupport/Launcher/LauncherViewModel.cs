@@ -104,9 +104,9 @@ public sealed partial class LauncherViewModel : ObservableObject
         // ring out of usefulness. The folder tile opens a list of its own instead.
         bool hasFolders = FolderLinks.Count > 0;
 
-        // The three that are always there: the tools tile, the cutout tile and the overview.
+        // Always there: the tools tile and the overview (and the cutout tile, while it is enabled).
         Point[] offsets = RadialLayout.Offsets(
-            _ringModules.Count + WebLinks.Count + (hasFolders ? 1 : 0) + 3, Appearance.MenuRadius);
+            _ringModules.Count + WebLinks.Count + (hasFolders ? 1 : 0) + (CutoutEnabled ? 3 : 2), Appearance.MenuRadius);
 
         // A tile is the whole item now, so both axes centre on the tile.
         double centre = Appearance.MenuSize / 2 - Appearance.TileSize / 2;
@@ -130,8 +130,11 @@ public sealed partial class LauncherViewModel : ObservableObject
         }
 
         // A mode rather than a window: the screen dims and whatever is under the cursor can be cut out.
-        Point cutoutAt = offsets[slot++];
-        Items.Add(new LauncherItem("ContentCut", "누끼", centreX + cutoutAt.X, centreY + cutoutAt.Y, StartCutout));
+        if (CutoutEnabled)
+        {
+            Point cutoutAt = offsets[slot++];
+            Items.Add(new LauncherItem("ContentCut", "누끼", centreX + cutoutAt.X, centreY + cutoutAt.Y, StartCutout));
+        }
 
         foreach (LauncherLink link in WebLinks)
         {
@@ -395,6 +398,12 @@ public sealed partial class LauncherViewModel : ObservableObject
     /// The menu shuts at once rather than animating out: the overlay paints a live capture of the
     /// screen, and a menu caught half-way through closing would be in it.
     /// </summary>
+    /// <summary>
+    /// The SAM cutout tile is switched off in this build: its model download and GPU load are
+    /// more than the tool needs right now. The code stays; set this to true to bring the tile back.
+    /// </summary>
+    private static readonly bool CutoutEnabled = false;
+
     private async void StartCutout()
     {
         CollapseNowRequested?.Invoke(this, EventArgs.Empty);
