@@ -211,6 +211,12 @@ public sealed partial class WiresharkViewModel : ObservableObject, IDisposable
             catch (OperationCanceledException)
             {
             }
+            finally
+            {
+                // Unloaded here, never from the UI thread: a stop that gives up waiting must not
+                // free the producer DLL while a poll is still inside it.
+                monitor.Dispose();
+            }
         });
     }
 
@@ -225,10 +231,8 @@ public sealed partial class WiresharkViewModel : ObservableObject, IDisposable
         catch (AggregateException)
         {
         }
-        _cxpStop?.Dispose();
         _cxpStop = null;
         _cxpLoop = null;
-        _cxp?.Dispose();
         _cxp = null;
         IsCxpWatching = false;
         CxpConnections.Clear();

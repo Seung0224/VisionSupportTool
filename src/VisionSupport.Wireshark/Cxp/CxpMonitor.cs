@@ -1,5 +1,3 @@
-using System.IO;
-using System.Xml;
 using VisionSupport.Wireshark.Settings;
 
 namespace VisionSupport.Wireshark.Cxp;
@@ -45,9 +43,20 @@ public sealed class CxpMonitor : IDisposable
             settings.CxpNodes.ToList(), clock) { _dispose = () => gentl?.Dispose() };
     }
 
+    /// <summary>Never throws: the loop calling this runs for days, and a dead loop would leave a
+    /// frozen card that no longer reports an unplugged board.</summary>
     public CxpReport Poll()
     {
-        (bool present, string name) = _presence();
+        bool present;
+        string name;
+        try
+        {
+            (present, name) = _presence();
+        }
+        catch (Exception ex)
+        {
+            return PresenceOnly("CXP", $"상세 불가 — 장치 확인 실패: {ex.Message}");
+        }
         if (!present) return new CxpReport(BoardId, name, CxpMode.Absent, Array.Empty<CxpConnectionStatus>(), null);
         if (_openSession is null) return PresenceOnly(name, "상세 불가 — GenTL 프로듀서를 찾을 수 없음 (보드 연결 여부만 감시)");
         if (_bindings.Count == 0) return PresenceOnly(name, "상세 불가 — 읽을 노드가 설정되지 않음 (진단 덤프 후 설정)");
@@ -63,9 +72,7 @@ public sealed class CxpMonitor : IDisposable
             _failedAt = null;
             return new CxpReport(BoardId, name, CxpMode.Full, Group(readings), null);
         }
-        catch (Exception ex) when (ex is GenTLException or InvalidOperationException or NotSupportedException
-            or DllNotFoundException or EntryPointNotFoundException or BadImageFormatException
-            or IOException or XmlException)
+        catch (Exception ex)
         {
             _failedAt = _clock.GetUtcNow();
             _failure = $"상세 불가 — {ex.Message} (보드 연결 여부만 감시)";

@@ -97,4 +97,25 @@ public class CxpMonitorTests
         Assert.Contains("다른 프로세스가 사용 중", first.Message);
         Assert.Equal(2, attempts);
     }
+
+    /// <summary>A WMI hiccup must not end the watch: the poll loop runs for days.</summary>
+    [Fact]
+    public void A_failing_device_query_is_reported_not_thrown()
+    {
+        var monitor = new CxpMonitor(() => throw new InvalidCastException("WMI"), null, new[] { Link0 }, _clock);
+
+        CxpReport r = monitor.Poll();
+
+        Assert.Equal(CxpMode.PresenceOnly, r.Mode);
+        Assert.Contains("WMI", r.Message);
+    }
+
+    [Fact]
+    public void Any_failure_while_reading_degrades_instead_of_throwing()
+    {
+        CxpMonitor monitor = Monitor(read: _ => throw new ArgumentOutOfRangeException("node"), bindings: Link0);
+
+        Assert.Equal(CxpMode.PresenceOnly, monitor.Poll().Mode);
+        Assert.All(_opened, s => Assert.True(s.Disposed));
+    }
 }
