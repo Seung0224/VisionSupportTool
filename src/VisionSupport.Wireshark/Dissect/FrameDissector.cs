@@ -187,9 +187,14 @@ public static class FrameDissector
         int payloadAt = at + 8;
         if (payloadAt >= f.Length) return;
         ReadOnlySpan<byte> payload = f.AsSpan(payloadAt);
-        // GVCP/GVSP are wired in by Task 7.
-        _ = payload;
-        _ = context;
+        if (dp == DissectorContext.GvcpPort || sp == DissectorContext.GvcpPort)
+        {
+            GigEDissector.TryDissectGvcp(payload, payloadAt, packet, context, fromCamera: sp == DissectorContext.GvcpPort);
+        }
+        else if (packet.SrcIp is not null && context.IsCamera(packet.SrcIp))
+        {
+            GigEDissector.TryDissectGvsp(payload, payloadAt, packet);
+        }
     }
 
     private static string FlagText(TcpFlags flags)

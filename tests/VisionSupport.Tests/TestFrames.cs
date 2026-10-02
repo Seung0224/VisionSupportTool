@@ -108,4 +108,46 @@ internal static class TestFrames
         if (response) BinaryPrimitives.WriteUInt32LittleEndian(p.AsSpan(38), result);
         return p;
     }
+
+    public const string Camera = "192.168.1.20";
+    public const string Host = "192.168.1.2";
+
+    public static byte[] GvcpReadRegCmd(ushort reqId)
+    {
+        var p = new byte[12];
+        p[0] = 0x42; p[1] = 0x01;
+        BinaryPrimitives.WriteUInt16BigEndian(p.AsSpan(2), 0x0080);
+        BinaryPrimitives.WriteUInt16BigEndian(p.AsSpan(4), 4);
+        BinaryPrimitives.WriteUInt16BigEndian(p.AsSpan(6), reqId);
+        BinaryPrimitives.WriteUInt32BigEndian(p.AsSpan(8), 0x0A00);
+        return Udp(Host, 50001, Camera, 3956, p);
+    }
+
+    public static byte[] GvcpReadRegAck(ushort ackId, ushort status = 0)
+    {
+        var p = new byte[12];
+        BinaryPrimitives.WriteUInt16BigEndian(p.AsSpan(0), status);
+        BinaryPrimitives.WriteUInt16BigEndian(p.AsSpan(2), 0x0081);
+        BinaryPrimitives.WriteUInt16BigEndian(p.AsSpan(4), 4);
+        BinaryPrimitives.WriteUInt16BigEndian(p.AsSpan(6), ackId);
+        return Udp(Camera, 3956, Host, 50001, p);
+    }
+
+    public static byte[] Gvsp(ushort block, uint packetId, GvspFormat format)
+    {
+        var p = new byte[8 + 16];
+        BinaryPrimitives.WriteUInt16BigEndian(p.AsSpan(2), block);
+        p[4] = (byte)format;
+        p[5] = (byte)(packetId >> 16); p[6] = (byte)(packetId >> 8); p[7] = (byte)packetId;
+        return Udp(Camera, 20202, Host, 50010, p);
+    }
+
+    public static byte[] GvspExtended(ulong block, uint packetId, GvspFormat format)
+    {
+        var p = new byte[20 + 16];
+        p[4] = (byte)(0x80 | (byte)format);
+        BinaryPrimitives.WriteUInt64BigEndian(p.AsSpan(8), block);
+        BinaryPrimitives.WriteUInt32BigEndian(p.AsSpan(16), packetId);
+        return Udp(Camera, 20202, Host, 50010, p);
+    }
 }
