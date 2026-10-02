@@ -14,7 +14,9 @@ public partial class WiresharkView : UserControl, IDisposable
 {
     private const string HangulFontAlias = "VisionSupport Hangul";
     private readonly WiresharkViewModel _viewModel;
-    private DateTime _timeOrigin;
+    /// <summary>X is seconds from here. Never left at MinValue: an empty chart still labels its
+    /// default -10..10 s axis, and MinValue minus ten seconds throws.</summary>
+    private DateTime _timeOrigin = DateTime.Now;
 
     public WiresharkView(WiresharkViewModel viewModel)
     {
@@ -82,12 +84,13 @@ public partial class WiresharkView : UserControl, IDisposable
     {
         PlotFonts.Default = RegisterHangulFont();
         Plot plot = Chart.Plot;
-        plot.FigureBackground.Color = PlotColor.FromHex("#252526");
-        plot.DataBackground.Color = PlotColor.FromHex("#252526");
+        plot.FigureBackground.Color = PlotColor.FromHex("#1E1E1E");
+        plot.DataBackground.Color = PlotColor.FromHex("#1E1E1E");
         plot.Axes.Color(PlotColor.FromHex("#9D9D9D"));
         plot.Grid.MajorLineColor = PlotColor.FromHex("#2F2F2F");
-        plot.Axes.Left.Label.Text = "B/s";
+        plot.Axes.Left.Label.Text = "송수신 B/s";
         plot.Axes.Right.Label.Text = "응답 ms";
+        plot.Axes.Bottom.Label.Text = "시각";
         foreach (var axis in new IAxis[] { plot.Axes.Bottom, plot.Axes.Left, plot.Axes.Right })
         {
             axis.Label.FontName = PlotFonts.Default;

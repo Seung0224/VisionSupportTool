@@ -1,6 +1,8 @@
 <!--
-    Laid out like the memory monitor: toolbar, then what matters most, then detail. The cards are
-    the answer to "is anything wrong?"; everything under them is for finding out why.
+    Same frame as the memory monitor: toolbar strip, then the answer, then the evidence.
+    The badge and cards answer "is anything wrong?"; the chart shows the focused target over time;
+    the tabs are where you go to find out why. Every list is a DataGrid because that is what the
+    shell theme styles - ListView and TreeView would come up in default white.
 -->
 <UserControl x:Class="VisionSupport.Wireshark.WiresharkView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
@@ -8,218 +10,349 @@
              xmlns:local="clr-namespace:VisionSupport.Wireshark"
              xmlns:sp="clr-namespace:ScottPlot.WPF;assembly=ScottPlot.WPF"
              Background="{StaticResource Bg}"
-             TextOptions.TextFormattingMode="Display">
+             TextOptions.TextFormattingMode="Display"
+             ToolTipService.ShowDuration="30000" ToolTipService.InitialShowDelay="350">
 
     <UserControl.Resources>
         <local:HealthBrushConverter x:Key="HealthBrush"/>
         <local:BoolToVisibilityConverter x:Key="BoolToVis"/>
         <local:InverseBoolToVisibilityConverter x:Key="NotBoolToVis"/>
+        <local:InverseBoolConverter x:Key="Not"/>
+        <local:ZeroToVisibilityConverter x:Key="ZeroToVis"/>
+
+        <Style x:Key="Separator" TargetType="Rectangle">
+            <Setter Property="Width" Value="1"/>
+            <Setter Property="Fill" Value="{StaticResource Border}"/>
+            <Setter Property="Margin" Value="8,2"/>
+        </Style>
+
+        <Style x:Key="RightAligned" TargetType="TextBlock">
+            <Setter Property="HorizontalAlignment" Value="Right"/>
+        </Style>
+
+        <Style x:Key="Mono" TargetType="TextBlock">
+            <Setter Property="FontFamily" Value="Consolas"/>
+            <Setter Property="FontSize" Value="12"/>
+        </Style>
+
     </UserControl.Resources>
 
-    <Grid Margin="12">
+    <Grid>
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>   <!-- toolbar -->
-            <RowDefinition Height="Auto"/>   <!-- errors -->
-            <RowDefinition Height="Auto"/>   <!-- cards -->
-            <RowDefinition Height="150"/>    <!-- chart -->
-            <RowDefinition Height="*"/>      <!-- packets -->
-            <RowDefinition Height="5"/>
-            <RowDefinition Height="220"/>    <!-- detail + tabs -->
+            <RowDefinition Height="Auto"/>                  <!-- toolbar -->
+            <RowDefinition Height="Auto"/>                  <!-- badge + cards -->
+            <RowDefinition Height="2*" MinHeight="150"/>    <!-- chart -->
+            <RowDefinition Height="Auto"/>                  <!-- stat strip -->
+            <RowDefinition Height="3*" MinHeight="240"/>    <!-- tabs -->
+            <RowDefinition Height="Auto"/>                  <!-- status bar -->
         </Grid.RowDefinitions>
 
-        <!-- Toolbar -->
-        <DockPanel Grid.Row="0" Margin="0,0,0,8" LastChildFill="True">
-            <TextBlock Text="인터페이스" Foreground="{StaticResource FgDim}" VerticalAlignment="Center" Margin="0,0,6,0"/>
-            <ComboBox Width="260" ItemsSource="{Binding Nics}" SelectedItem="{Binding SelectedNic}"
-                      ToolTip="비워 두면 모든 NIC를 봅니다. 캡처 중에 바꾸면 그 NIC 것만 이어서 받습니다."/>
-            <Button Content="↻" Width="28" Margin="4,0" Command="{Binding RefreshNicsCommand}" ToolTip="NIC 목록 새로 고침"/>
-            <Button Content="캡처 시작" Style="{StaticResource AccentButton}" Margin="8,0,0,0" Padding="12,3"
-                    Command="{Binding StartCaptureCommand}"
-                    Visibility="{Binding IsCapturing, Converter={StaticResource NotBoolToVis}}"/>
-            <Button Content="캡처 정지" Margin="8,0,0,0" Padding="12,3" Command="{Binding StopCaptureCommand}"
-                    Visibility="{Binding IsCapturing, Converter={StaticResource BoolToVis}}"/>
-            <Button Content="CXP 감시 시작" Margin="8,0,0,0" Padding="12,3" Command="{Binding StartCxpCommand}"
-                    Visibility="{Binding IsCxpWatching, Converter={StaticResource NotBoolToVis}}"/>
-            <Button Content="CXP 감시 정지" Margin="8,0,0,0" Padding="12,3" Command="{Binding StopCxpCommand}"
-                    Visibility="{Binding IsCxpWatching, Converter={StaticResource BoolToVis}}"/>
-            <Button Content="이상 확인" Margin="8,0,0,0" Padding="12,3" Command="{Binding AcknowledgeCommand}"
-                    Visibility="{Binding HasAlert, Converter={StaticResource BoolToVis}}"
-                    ToolTip="런처의 빨간 링을 끕니다. 새 이상이 생기면 다시 켜집니다."/>
-            <Button Content="pcapng 저장" Margin="8,0,0,0" Padding="12,3" Click="OnExport"/>
-            <Button Content="목록 비우기" Margin="8,0,0,0" Padding="12,3" Command="{Binding ClearPacketsCommand}"/>
-            <TextBox Margin="12,0,0,0" Text="{Binding FilterText, UpdateSourceTrigger=PropertyChanged, Delay=300}"
-                     ToolTip="공백으로 나눈 단어 모두 일치 · !단어 제외 · id:대상 · 이상"/>
-        </DockPanel>
-
-        <TextBlock Grid.Row="1" Text="{Binding CaptureError}" Foreground="{StaticResource StateFaulted}"
-                   TextWrapping="Wrap" Margin="0,0,0,6">
-            <TextBlock.Style>
-                <Style TargetType="TextBlock">
-                    <Style.Triggers>
-                        <Trigger Property="Text" Value="">
-                            <Setter Property="Visibility" Value="Collapsed"/>
-                        </Trigger>
-                    </Style.Triggers>
-                </Style>
-            </TextBlock.Style>
-        </TextBlock>
-
-        <!-- Cards: one per watched target. Click to focus, pin to keep across restarts. -->
-        <ItemsControl Grid.Row="2" ItemsSource="{Binding Cards}" Margin="0,0,0,8">
-            <ItemsControl.ItemsPanel>
-                <ItemsPanelTemplate>
-                    <WrapPanel/>
-                </ItemsPanelTemplate>
-            </ItemsControl.ItemsPanel>
-            <ItemsControl.ItemTemplate>
-                <DataTemplate>
-                    <Grid Width="250" Margin="0,0,8,8" Cursor="Hand"
-                          MouseLeftButtonUp="OnCardClicked">
-                        <Border Background="{StaticResource Panel}" CornerRadius="6" BorderThickness="0,0,0,0"/>
-                        <!-- Candidates (not pinned yet) get a dashed outline. -->
-                        <Rectangle RadiusX="6" RadiusY="6" StrokeThickness="1" StrokeDashArray="4 3"
-                                   Stroke="{StaticResource Border}"
-                                   Visibility="{Binding Pinned, Converter={StaticResource NotBoolToVis}}"/>
-                        <Border BorderBrush="{Binding Level, Converter={StaticResource HealthBrush}}"
-                                BorderThickness="5,0,0,0" CornerRadius="6,0,0,6" HorizontalAlignment="Left" Width="5"/>
-                        <StackPanel Margin="14,8,8,8">
-                            <DockPanel>
-                                <Button DockPanel.Dock="Right" Padding="6,0" FontSize="11"
-                                        Command="{Binding DataContext.TogglePinCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                        CommandParameter="{Binding}"
-                                        Visibility="{Binding CanPin, Converter={StaticResource BoolToVis}}">
-                                    <Button.Style>
-                                        <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
-                                            <Setter Property="Content" Value="고정"/>
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding Pinned}" Value="True">
-                                                    <Setter Property="Content" Value="해제"/>
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </Button.Style>
-                                </Button>
-                                <TextBlock Text="{Binding Name}" Foreground="{StaticResource Fg}" FontWeight="SemiBold"
-                                           TextTrimming="CharacterEllipsis" ToolTip="{Binding Id}"/>
-                            </DockPanel>
-                            <TextBlock Text="{Binding Summary}" Margin="0,4,0,0" FontSize="13"
-                                       Foreground="{Binding Level, Converter={StaticResource HealthBrush}}"
-                                       TextTrimming="CharacterEllipsis" ToolTip="{Binding Summary}"/>
-                        </StackPanel>
-                    </Grid>
-                </DataTemplate>
-            </ItemsControl.ItemTemplate>
-        </ItemsControl>
-
-        <!-- Chart for the focused card -->
-        <Border Grid.Row="3" Background="{StaticResource Panel}" CornerRadius="6" Margin="0,0,0,8">
-            <Grid>
-                <sp:WpfPlot x:Name="Chart"/>
-                <TextBlock x:Name="ChartHint" Text="카드를 누르면 그 대상의 송수신량과 응답 시간이 여기 그려집니다."
-                           Foreground="{StaticResource FgDim}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-            </Grid>
+        <!-- toolbar -->
+        <Border Grid.Row="0" Background="{StaticResource Panel}" BorderBrush="{StaticResource Border}"
+                BorderThickness="0,0,0,1" Padding="12,10">
+            <DockPanel>
+                <Button DockPanel.Dock="Right" Content="이상 확인" Command="{Binding AcknowledgeCommand}"
+                        Background="{StaticResource StateFaulted}" Foreground="#FF1E1E1E"
+                        Visibility="{Binding HasAlert, Converter={StaticResource BoolToVis}}"
+                        ToolTip="런처 아이콘의 빨간 링을 끕니다. 새 이상이 생기면 다시 켜집니다."/>
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="인터페이스" Foreground="{StaticResource FgDim}" Margin="0,0,8,0"
+                               VerticalAlignment="Center"/>
+                    <ComboBox Width="320" ItemsSource="{Binding Nics}" SelectedItem="{Binding SelectedNic}"
+                              ToolTip="비워 두면 모든 NIC를 봅니다. 캡처 중에 바꾸면 그 NIC 것만 이어서 받습니다."/>
+                    <Button Content="새로고침" Command="{Binding RefreshNicsCommand}" Margin="6,0,6,0"
+                            ToolTip="pktmon 이 보는 NIC 목록을 다시 읽습니다."/>
+                    <Button Content="캡처 시작" Command="{Binding StartCaptureCommand}"
+                            Background="{StaticResource Accent}"
+                            IsEnabled="{Binding IsCapturing, Converter={StaticResource Not}}"
+                            ToolTip="Windows 내장 pktmon 으로 이 PC 의 NIC 를 오가는 패킷을 받습니다. 설치할 것은 없습니다."/>
+                    <Button Content="캡처 중지" Command="{Binding StopCaptureCommand}"
+                            IsEnabled="{Binding IsCapturing}"/>
+                    <Rectangle Style="{StaticResource Separator}"/>
+                    <Button Content="CXP 감시 시작" Command="{Binding StartCxpCommand}"
+                            Background="{StaticResource Accent}"
+                            IsEnabled="{Binding IsCxpWatching, Converter={StaticResource Not}}"
+                            ToolTip="Rapixo CXP 보드의 연결과 링크 상태·에러 카운터를 1초마다 읽습니다. 보드를 붙잡고 있지 않아 VISION 그랩을 막지 않습니다."/>
+                    <Button Content="CXP 감시 중지" Command="{Binding StopCxpCommand}"
+                            IsEnabled="{Binding IsCxpWatching}"/>
+                    <Rectangle Style="{StaticResource Separator}"/>
+                    <Button Content="pcapng 저장" Click="OnExport"
+                            ToolTip="보관 중인 패킷을 Wireshark 에서 열 수 있는 파일로 저장합니다."/>
+                    <Button Content="목록 비우기" Command="{Binding ClearPacketsCommand}" Margin="6,0,0,0"/>
+                </StackPanel>
+            </DockPanel>
         </Border>
 
-        <!-- Packet list -->
-        <ListView Grid.Row="4" x:Name="PacketList" ItemsSource="{Binding Rows}" SelectedItem="{Binding SelectedPacket}"
-                  VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling"
-                  Background="{StaticResource Panel}" BorderBrush="{StaticResource Border}">
-            <ListView.ItemContainerStyle>
-                <Style TargetType="ListViewItem">
-                    <Style.Triggers>
-                        <DataTrigger Binding="{Binding IsAnomalous}" Value="True">
-                            <Setter Property="Background" Value="#40F48771"/>
-                        </DataTrigger>
-                    </Style.Triggers>
-                </Style>
-            </ListView.ItemContainerStyle>
-            <ListView.View>
-                <GridView>
-                    <GridViewColumn Header="No" Width="70" DisplayMemberBinding="{Binding Number}"/>
-                    <GridViewColumn Header="시간" Width="110" DisplayMemberBinding="{Binding Time, StringFormat=HH:mm:ss.fff}"/>
-                    <GridViewColumn Header="출발" Width="170" DisplayMemberBinding="{Binding Source}"/>
-                    <GridViewColumn Header="목적" Width="170" DisplayMemberBinding="{Binding Destination}"/>
-                    <GridViewColumn Header="프로토콜" Width="70" DisplayMemberBinding="{Binding Protocol}"/>
-                    <GridViewColumn Header="길이" Width="60" DisplayMemberBinding="{Binding OriginalLength}"/>
-                    <GridViewColumn Header="정보" Width="520" DisplayMemberBinding="{Binding Info}"/>
-                </GridView>
-            </ListView.View>
-        </ListView>
+        <!-- overall badge + one card per target -->
+        <Border Grid.Row="1" BorderBrush="{StaticResource Border}" BorderThickness="0,0,0,1" Padding="12,10,12,4">
+            <DockPanel>
+                <Border DockPanel.Dock="Left" Width="150" Margin="0,0,10,6" Padding="14,10"
+                        Background="{StaticResource Panel}" CornerRadius="8"
+                        BorderBrush="{Binding OverallLevel, Converter={StaticResource HealthBrush}}"
+                        BorderThickness="1">
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="전체 상태" Foreground="{StaticResource FgDim}" FontSize="11"/>
+                        <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                            <Ellipse Width="12" Height="12" VerticalAlignment="Center" Margin="0,0,8,0"
+                                     Fill="{Binding OverallLevel, Converter={StaticResource HealthBrush}}"/>
+                            <TextBlock Text="{Binding OverallText}" FontSize="20" FontWeight="SemiBold"
+                                       Foreground="{Binding OverallLevel, Converter={StaticResource HealthBrush}}"/>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
 
-        <GridSplitter Grid.Row="5" HorizontalAlignment="Stretch" Background="{StaticResource Border}"/>
+                <Grid>
+                    <ItemsControl ItemsSource="{Binding Cards}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <WrapPanel/>
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Grid Width="240" Height="64" Margin="0,0,8,6" Cursor="Hand"
+                                      Background="Transparent" MouseLeftButtonUp="OnCardClicked"
+                                      ToolTip="눌러서 이 대상의 패킷과 차트를 봅니다.">
+                                    <Border Background="{StaticResource Panel}" CornerRadius="8"/>
+                                    <!-- Candidates (not pinned yet) get a dashed outline; pinned ones a solid one. -->
+                                    <Rectangle RadiusX="8" RadiusY="8" StrokeThickness="1" StrokeDashArray="4 3"
+                                               Stroke="{StaticResource Border}"
+                                               Visibility="{Binding Pinned, Converter={StaticResource NotBoolToVis}}"/>
+                                    <Border CornerRadius="8" BorderThickness="1" BorderBrush="{StaticResource Border}"
+                                            Visibility="{Binding Pinned, Converter={StaticResource BoolToVis}}"/>
+                                    <Border Width="4" HorizontalAlignment="Left" CornerRadius="8,0,0,8"
+                                            Background="{Binding Level, Converter={StaticResource HealthBrush}}"/>
+                                    <DockPanel Margin="14,8,8,8">
+                                        <DockPanel DockPanel.Dock="Top">
+                                            <Button DockPanel.Dock="Right" Padding="8,1" FontSize="11" MinWidth="0"
+                                                    Command="{Binding DataContext.TogglePinCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                    CommandParameter="{Binding}"
+                                                    Visibility="{Binding CanPin, Converter={StaticResource BoolToVis}}">
+                                                <Button.Style>
+                                                    <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                                                        <Setter Property="Content" Value="고정"/>
+                                                        <Setter Property="ToolTip" Value="고정하면 다음 실행에도 감시하고, 끊기면 런처 링이 빨갛게 됩니다."/>
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding Pinned}" Value="True">
+                                                                <Setter Property="Content" Value="해제"/>
+                                                                <Setter Property="ToolTip" Value="감시 대상에서 뺍니다."/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Button.Style>
+                                            </Button>
+                                            <TextBlock Text="{Binding Name}" Foreground="{StaticResource Fg}" FontWeight="SemiBold"
+                                                       VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                                        </DockPanel>
+                                        <TextBlock Text="{Binding Summary}" Margin="0,6,0,0" FontSize="13"
+                                                   Foreground="{Binding Level, Converter={StaticResource HealthBrush}}"
+                                                   TextTrimming="CharacterEllipsis" ToolTip="{Binding Summary}"/>
+                                    </DockPanel>
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <TextBlock Text="캡처를 시작하면 MC·ADS 로 말하는 PLC 와 GigE 카메라가 여기 후보로 나타납니다. 고정한 대상이 끊기거나 늦어지면 빨갛게 바뀝니다."
+                               Foreground="{StaticResource FgDim}" VerticalAlignment="Center" TextWrapping="Wrap"
+                               Margin="4,0,0,6"
+                               Visibility="{Binding Cards.Count, Converter={StaticResource ZeroToVis}}"/>
+                </Grid>
+            </DockPanel>
+        </Border>
 
-        <!-- Detail and tabs -->
-        <Grid Grid.Row="6">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="5"/>
-                <ColumnDefinition Width="*"/>
-            </Grid.ColumnDefinitions>
+        <!-- chart for the focused card -->
+        <Grid Grid.Row="2">
+            <sp:WpfPlot x:Name="Chart"/>
+            <TextBlock x:Name="ChartHint" Text="카드를 누르면 그 대상의 송수신량(파랑)과 응답 시간(노랑)이 여기 그려집니다."
+                       Foreground="{StaticResource FgDim}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+        </Grid>
 
-            <TabControl Grid.Column="0">
-                <TabItem Header="패킷 상세">
-                    <Grid>
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="*"/>
-                            <RowDefinition Height="*"/>
-                        </Grid.RowDefinitions>
-                        <TreeView ItemsSource="{Binding SelectedLayers}" Background="{StaticResource Panel}">
+        <!-- stat strip -->
+        <Border Grid.Row="3" Background="{StaticResource Panel}" BorderBrush="{StaticResource Border}"
+                BorderThickness="0,1,0,1" Padding="12,6">
+            <DockPanel>
+                <TextBlock DockPanel.Dock="Right" Style="{StaticResource Mono}" Foreground="{StaticResource FgDim}"
+                           Text="{Binding FocusedCard.Name, StringFormat=차트: {0}, FallbackValue=''}"/>
+                <TextBlock Foreground="{StaticResource Fg}" FontFamily="Consolas" FontSize="12">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="Text" Value="{Binding Status}"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsWorking}" Value="False">
+                                    <Setter Property="Text" Value="캡처와 CXP 감시가 꺼져 있습니다"/>
+                                    <Setter Property="Foreground" Value="{StaticResource FgDim}"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+            </DockPanel>
+        </Border>
+
+        <!-- evidence -->
+        <TabControl Grid.Row="4" Background="{StaticResource Bg}" BorderThickness="0" Padding="0" Margin="0,4,0,0">
+            <TabItem Header="패킷">
+                <Grid Margin="8">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="6"/>
+                        <RowDefinition Height="170"/>
+                    </Grid.RowDefinitions>
+
+                    <DockPanel Grid.Row="0" Margin="0,0,0,8">
+                        <TextBlock Text="표시 필터" Foreground="{StaticResource FgDim}" Margin="0,0,8,0"
+                                   VerticalAlignment="Center"/>
+                        <Button DockPanel.Dock="Right" Content="필터 지우기" Command="{Binding ClearFilterCommand}"
+                                Margin="6,0,0,0"/>
+                        <TextBox Text="{Binding FilterText, UpdateSourceTrigger=PropertyChanged, Delay=300}"
+                                 ToolTip="공백으로 나눈 단어가 모두 맞는 패킷만 보입니다. !단어 = 제외, id:대상 = 그 대상만, 이상 = 문제 패킷만. 예) MC !192.168.0.5"/>
+                    </DockPanel>
+
+                    <DataGrid Grid.Row="1" ItemsSource="{Binding Rows}" SelectedItem="{Binding SelectedPacket}"
+                              SelectionMode="Single" FontFamily="Consolas" FontSize="12">
+                        <DataGrid.RowStyle>
+                            <Style TargetType="DataGridRow" BasedOn="{StaticResource {x:Type DataGridRow}}">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsAnomalous}" Value="True">
+                                        <Setter Property="Background" Value="#55F48771"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </DataGrid.RowStyle>
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="No" Binding="{Binding Number}" Width="70"
+                                                ElementStyle="{StaticResource RightAligned}"/>
+                            <DataGridTextColumn Header="시간" Binding="{Binding Time, StringFormat=HH:mm:ss.fff}" Width="115"/>
+                            <DataGridTextColumn Header="출발" Binding="{Binding Source}" Width="160"/>
+                            <DataGridTextColumn Header="목적" Binding="{Binding Destination}" Width="160"/>
+                            <DataGridTextColumn Header="프로토콜" Binding="{Binding Protocol}" Width="80"/>
+                            <DataGridTextColumn Header="길이" Binding="{Binding OriginalLength}" Width="60"
+                                                ElementStyle="{StaticResource RightAligned}"/>
+                            <DataGridTextColumn Header="정보" Binding="{Binding Info}" Width="*"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+
+                    <GridSplitter Grid.Row="2" HorizontalAlignment="Stretch" Background="Transparent"/>
+
+                    <Grid Grid.Row="3">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="8"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+
+                        <!-- protocol tree, Wireshark's middle pane -->
+                        <TreeView Grid.Column="0" ItemsSource="{Binding SelectedLayers}"
+                                  Background="{StaticResource Bg}" BorderBrush="{StaticResource Border}"
+                                  BorderThickness="1" Padding="4">
+                            <TreeView.ItemContainerStyle>
+                                <Style TargetType="TreeViewItem">
+                                    <Setter Property="Foreground" Value="{StaticResource Fg}"/>
+                                    <Setter Property="IsExpanded" Value="True"/>
+                                    <Setter Property="Padding" Value="2,1"/>
+                                </Style>
+                            </TreeView.ItemContainerStyle>
                             <TreeView.ItemTemplate>
                                 <HierarchicalDataTemplate ItemsSource="{Binding Children}">
-                                    <TextBlock Text="{Binding Text}" Foreground="{StaticResource Fg}"/>
+                                    <TextBlock Text="{Binding Text}" Foreground="{StaticResource Fg}"
+                                               FontFamily="Consolas" FontSize="12"/>
                                 </HierarchicalDataTemplate>
                             </TreeView.ItemTemplate>
                         </TreeView>
-                        <TextBox Grid.Row="1" Text="{Binding HexDump, Mode=OneWay}" IsReadOnly="True"
-                                 FontFamily="Consolas" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"/>
+
+                        <!-- bytes, Wireshark's bottom pane -->
+                        <TextBox Grid.Column="2" Text="{Binding HexDump, Mode=OneWay}" IsReadOnly="True"
+                                 FontFamily="Consolas" FontSize="12" TextWrapping="NoWrap"
+                                 VerticalContentAlignment="Top"
+                                 VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"/>
                     </Grid>
-                </TabItem>
-            </TabControl>
+                </Grid>
+            </TabItem>
 
-            <GridSplitter Grid.Column="1" HorizontalAlignment="Stretch" Background="{StaticResource Border}"/>
+            <TabItem Header="이상 목록">
+                <DataGrid Margin="8" ItemsSource="{Binding Anomalies}" SelectedItem="{Binding SelectedAnomaly}"
+                          SelectionMode="Single"
+                          ToolTip="행을 누르면 패킷 탭에서 그 패킷을 선택합니다.">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="시간" Binding="{Binding Time, StringFormat=HH:mm:ss}" Width="90"/>
+                        <DataGridTemplateColumn Header="심각도" Width="70">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <Ellipse Width="10" Height="10" HorizontalAlignment="Left"
+                                             Fill="{Binding Severity, Converter={StaticResource HealthBrush}}"/>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+                        <DataGridTextColumn Header="대상" Binding="{Binding TargetName}" Width="240"/>
+                        <DataGridTextColumn Header="내용" Binding="{Binding Text}" Width="*"/>
+                        <DataGridTextColumn Header="패킷" Binding="{Binding PacketNumber}" Width="80"
+                                            ElementStyle="{StaticResource RightAligned}"/>
+                    </DataGrid.Columns>
+                </DataGrid>
+            </TabItem>
 
-            <TabControl Grid.Column="2">
-                <TabItem Header="이상 목록">
-                    <ListView ItemsSource="{Binding Anomalies}" SelectedItem="{Binding SelectedAnomaly}"
-                              Background="{StaticResource Panel}">
-                        <ListView.View>
-                            <GridView>
-                                <GridViewColumn Header="시간" Width="80" DisplayMemberBinding="{Binding Time, StringFormat=HH:mm:ss}"/>
-                                <GridViewColumn Header="대상" Width="170" DisplayMemberBinding="{Binding TargetName}"/>
-                                <GridViewColumn Header="내용" Width="320">
-                                    <GridViewColumn.CellTemplate>
-                                        <DataTemplate>
-                                            <TextBlock Text="{Binding Text}"
-                                                       Foreground="{Binding Severity, Converter={StaticResource HealthBrush}}"/>
-                                        </DataTemplate>
-                                    </GridViewColumn.CellTemplate>
-                                </GridViewColumn>
-                            </GridView>
-                        </ListView.View>
-                    </ListView>
-                </TabItem>
-                <TabItem Header="CXP">
-                    <DockPanel Margin="6">
-                        <DockPanel DockPanel.Dock="Top" Margin="0,0,0,6">
-                            <Button DockPanel.Dock="Right" Content="진단 덤프" Padding="10,2" Click="OnCxpDiagnostics"
-                                    ToolTip="VISION이 영상을 받는 중에 눌러야 실제 조건(동시 접근 가능 여부)을 볼 수 있습니다."/>
-                            <TextBlock Text="{Binding CxpMessage}" Foreground="{StaticResource FgDim}"
-                                       VerticalAlignment="Center" TextWrapping="Wrap"/>
+            <TabItem Header="CXP 카메라">
+                <DockPanel Margin="8">
+                    <Border DockPanel.Dock="Top" Margin="0,0,0,8" Padding="10,7" CornerRadius="4"
+                            Background="{StaticResource Panel}" BorderBrush="{StaticResource Border}" BorderThickness="1">
+                        <DockPanel>
+                            <Button DockPanel.Dock="Right" Content="진단 덤프" Click="OnCxpDiagnostics"
+                                    ToolTip="VISION 이 영상을 받는 중에 눌러야 동시 접근 가능 여부를 실제 조건에서 볼 수 있습니다."/>
+                            <TextBlock VerticalAlignment="Center" TextWrapping="Wrap" FontFamily="Consolas" FontSize="12"
+                                       Foreground="{StaticResource Fg}">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Text" Value="{Binding CxpMessage}"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsCxpWatching}" Value="False">
+                                                <Setter Property="Text" Value="CXP 감시가 꺼져 있습니다. 위의 'CXP 감시 시작'을 누르세요."/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
                         </DockPanel>
-                        <DataGrid ItemsSource="{Binding CxpConnections}" AutoGenerateColumns="False" IsReadOnly="True"
-                                  HeadersVisibility="Column">
-                            <DataGrid.Columns>
-                                <DataGridTextColumn Header="커넥션" Binding="{Binding Index}" Width="60"/>
-                                <DataGridTextColumn Header="링크" Binding="{Binding LinkUp}" Width="60"/>
-                                <DataGridTextColumn Header="속도" Binding="{Binding Speed}" Width="90"/>
-                                <DataGridTextColumn Header="에러" Binding="{Binding ErrorCount}" Width="70"/>
-                                <DataGridTextColumn Header="프레임" Binding="{Binding FrameCount}" Width="80"/>
-                                <DataGridTextColumn Header="드롭" Binding="{Binding DropCount}" Width="70"/>
-                            </DataGrid.Columns>
-                        </DataGrid>
-                    </DockPanel>
-                </TabItem>
-            </TabControl>
-        </Grid>
+                    </Border>
+                    <DataGrid ItemsSource="{Binding CxpConnections}">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="커넥션" Binding="{Binding Index}" Width="80"/>
+                            <DataGridTextColumn Header="링크" Binding="{Binding LinkUp}" Width="80"/>
+                            <DataGridTextColumn Header="속도" Binding="{Binding Speed}" Width="110"/>
+                            <DataGridTextColumn Header="에러" Binding="{Binding ErrorCount, StringFormat=N0}" Width="100"
+                                                ElementStyle="{StaticResource RightAligned}"/>
+                            <DataGridTextColumn Header="프레임" Binding="{Binding FrameCount, StringFormat=N0}" Width="110"
+                                                ElementStyle="{StaticResource RightAligned}"/>
+                            <DataGridTextColumn Header="드롭" Binding="{Binding DropCount, StringFormat=N0}" Width="*"
+                                                ElementStyle="{StaticResource RightAligned}"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </DockPanel>
+            </TabItem>
+        </TabControl>
+
+        <!-- status bar -->
+        <Border Grid.Row="5" Background="{StaticResource Panel}" BorderBrush="{StaticResource Border}"
+                BorderThickness="0,1,0,0" Padding="12,7">
+            <DockPanel>
+                <TextBlock DockPanel.Dock="Right" Text="캡처 중" Foreground="#FF1F9CF0"
+                           Visibility="{Binding IsCapturing, Converter={StaticResource BoolToVis}}"/>
+                <!-- The last error wins the bar; with none, a one-line reminder of how to read the screen. -->
+                <TextBlock TextTrimming="CharacterEllipsis" ToolTip="{Binding CaptureError}">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="Text" Value="{Binding CaptureError}"/>
+                            <Setter Property="Foreground" Value="{StaticResource StateFaulted}"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding CaptureError}" Value="">
+                                    <Setter Property="Text" Value="카드 = 대상별 판정 · 이상 목록 = 언제 무엇이 잘못됐는지 · 캡처는 관리자 권한 필요"/>
+                                    <Setter Property="Foreground" Value="{StaticResource FgDim}"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+            </DockPanel>
+        </Border>
     </Grid>
 </UserControl>

@@ -63,6 +63,26 @@ public class WiresharkViewModelTests
     });
 
     [Fact]
+    public void The_overall_badge_waits_while_pinned_targets_are_silent_since_start() => _app.Run(() =>
+    {
+        using var dir = new TempDir();
+        using var vm = new WiresharkViewModel(StoreWithPinnedPlc(dir), new ManualClock());
+
+        Assert.Equal(HealthLevel.Idle, vm.OverallLevel);
+        Assert.Equal("대기 중", vm.OverallText);
+    });
+
+    [Fact]
+    public void With_nothing_to_watch_the_badge_says_so() => _app.Run(() =>
+    {
+        using var dir = new TempDir();
+        using var vm = new WiresharkViewModel(new WiresharkSettingsStore(Path.Combine(dir.Path, "s.json")), new ManualClock());
+
+        Assert.Equal(HealthLevel.Idle, vm.OverallLevel);
+        Assert.Equal("감시 대상 없음", vm.OverallText);
+    });
+
+    [Fact]
     public void Disposing_twice_is_harmless() => _app.Run(() =>
     {
         using var dir = new TempDir();

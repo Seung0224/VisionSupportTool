@@ -94,6 +94,10 @@ public sealed partial class WiresharkViewModel : ObservableObject, IDisposable
     [ObservableProperty] private string _captureError = string.Empty;
     [ObservableProperty] private string _cxpMessage = string.Empty;
 
+    /// <summary>The one answer to "is anything wrong?", shown before any card.</summary>
+    [ObservableProperty] private HealthLevel _overallLevel;
+    [ObservableProperty] private string _overallText = "감시 대상 없음";
+
     public bool IsWorking => IsCapturing || IsCxpWatching;
 
     public ChartHistory? FocusedHistory => FocusedCard is { } c ? _history.GetValueOrDefault(c.Id) : null;
@@ -363,6 +367,7 @@ public sealed partial class WiresharkViewModel : ObservableObject, IDisposable
         DrainIncoming();
 
         HasAlert = _health.HasAlert;
+        UpdateOverall();
         Status = !IsWorking ? string.Empty
             : $"패킷 {Interlocked.Read(ref _nextNumber):N0} · 보관 {_packets.Count:N0}"
               + (_capture is { EventsLost: > 0 } c ? $" · 캡처 누락 {c.EventsLost:N0}" : string.Empty)
@@ -408,6 +413,33 @@ public sealed partial class WiresharkViewModel : ObservableObject, IDisposable
             _lastBytes.Remove(gone);
             if (FocusedCard?.Id == gone) FocusedCard = null;
         }
+    }
+
+    /// <summary>
+    /// Worst state among the targets that matter: pinned ones and the machine's own NIC/board, or
+    /// every card while nothing is pinned yet. Counts how many are in that state.
+    /// </summary>
+    private void UpdateOverall()
+    {
+        List<TargetCardViewModel> watched = Cards.Where(c => c.Pinned || !c.CanPin).ToList();
+        if (watched.Count == 0) watched = Cards.ToList();
+        if (watched.Count == 0)
+        {
+            OverallLevel = HealthLevel.Idle;
+            OverallText = "감시 대상 없음";
+            return;
+        }
+
+        HealthLevel worst = watched.Max(c => c.Level);
+        int count = watched.Count(c => c.Level == worst);
+        OverallLevel = worst;
+        OverallText = worst switch
+        {
+            HealthLevel.Bad => $"이상 {count}",
+            HealthLevel.Warn => $"주의 {count}",
+            HealthLevel.Ok => "정상",
+            _ => "대기 중",
+        };
     }
 
     private void ShowCxp(CxpReport report)

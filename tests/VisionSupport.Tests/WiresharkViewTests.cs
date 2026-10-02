@@ -1,4 +1,5 @@
 using System.IO;
+using System.Windows;
 using VisionSupport.Wireshark;
 using VisionSupport.Wireshark.Settings;
 using VisionSupport.Wireshark.ViewModels;
@@ -24,5 +25,29 @@ public class WiresharkViewTests
         var view = new WiresharkView(vm);
 
         Assert.Same(vm, view.DataContext);
+    });
+
+    /// <summary>An empty chart still draws its time axis; the label formatter must not run off DateTime.MinValue.</summary>
+    [Fact]
+    public void The_view_renders_with_an_empty_chart() => _app.Run(() =>
+    {
+        OverviewDialogAutomationTests.EnsureShellResourcesMerged();
+        using var dir = new TempDir();
+        using var vm = new WiresharkViewModel(new WiresharkSettingsStore(Path.Combine(dir.Path, "s.json")), new ManualClock());
+        var window = new Window
+        {
+            Content = new WiresharkView(vm), Width = 1280, Height = 860, Left = -4000, Top = -4000,
+            ShowInTaskbar = false, ShowActivated = false, WindowStyle = WindowStyle.None,
+        };
+
+        try
+        {
+            window.Show();
+            window.UpdateLayout();
+        }
+        finally
+        {
+            window.Close();
+        }
     });
 }

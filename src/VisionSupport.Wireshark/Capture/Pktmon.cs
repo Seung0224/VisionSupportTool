@@ -1,24 +1,23 @@
 using System.Diagnostics;
-using System.Globalization;
 using System.Text;
 
 namespace VisionSupport.Wireshark.Capture;
 
-/// <summary>Runs pktmon.exe and returns what it printed. Its console output is in the OEM code page.</summary>
+/// <summary>Runs pktmon.exe and returns what it printed. Redirected, it writes UTF-8 (checked on a
+/// Korean Windows 10: "드라이버" arrives as EB 93 9C ...), not the console's OEM code page.</summary>
 internal static class Pktmon
 {
     public static (int ExitCode, string Output) Run(string arguments)
     {
-        Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
-        Encoding oem = Encoding.GetEncoding(CultureInfo.CurrentCulture.TextInfo.OEMCodePage);
+        Encoding utf8 = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false);
         var info = new ProcessStartInfo("pktmon.exe", arguments)
         {
             UseShellExecute = false,
             CreateNoWindow = true,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
-            StandardOutputEncoding = oem,
-            StandardErrorEncoding = oem,
+            StandardOutputEncoding = utf8,
+            StandardErrorEncoding = utf8,
         };
 
         using Process process = Process.Start(info)
