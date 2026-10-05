@@ -59,3 +59,13 @@ public sealed class ZeroToVisibilityConverter : IValueConverter
     public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
         => throw new NotSupportedException();
 }
+
+/// <summary>Binds a group of radio buttons to one enum value: each button names its member in ConverterParameter.</summary>
+public sealed class EnumEqualsConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        => value?.ToString() == parameter as string;
+
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        => value is true ? Enum.Parse(targetType, (string)parameter) : Binding.DoNothing;
+}

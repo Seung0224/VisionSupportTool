@@ -22,6 +22,33 @@
         <local:InverseBoolToVisibilityConverter x:Key="NotBoolToVis"/>
         <local:InverseBoolConverter x:Key="Not"/>
         <local:ZeroToVisibilityConverter x:Key="ZeroToVis"/>
+        <local:EnumEqualsConverter x:Key="Is"/>
+
+        <!-- 전체 | ↑ 보냄 | ↓ 받음: one segmented control, the chosen segment filled. -->
+        <Style x:Key="Segment" TargetType="RadioButton">
+            <Setter Property="Foreground" Value="{StaticResource FgDim}"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RadioButton">
+                        <Border x:Name="Face" Background="Transparent" Padding="10,0" Height="22">
+                            <ContentPresenter VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Face" Property="Background" Value="{StaticResource ToolHover}"/>
+                            </Trigger>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Face" Property="Background" Value="{StaticResource Accent}"/>
+                                <Setter Property="Foreground" Value="White"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
 
         <SolidColorBrush x:Key="ToolFace" Color="#FF2D2D30"/>
         <SolidColorBrush x:Key="ToolHover" Color="#FF37373C"/>
@@ -492,12 +519,25 @@
                             </Grid.RowDefinitions>
 
                             <DockPanel Grid.Row="0" Margin="0,0,0,8">
+                                <Border DockPanel.Dock="Left" Margin="0,0,12,0" CornerRadius="3" BorderThickness="1"
+                                        BorderBrush="{StaticResource Border}" Background="{StaticResource ToolFace}"
+                                        VerticalAlignment="Center" ClipToBounds="True"
+                                        ToolTip="보냄 = 이 PC 가 내보낸 패킷, 받음 = 이 PC 로 들어온 패킷. 선택한 상대·필터와 함께 적용됩니다.">
+                                    <StackPanel Orientation="Horizontal">
+                                        <RadioButton Style="{StaticResource Segment}" Content="전체" GroupName="Direction"
+                                                     IsChecked="{Binding DirectionFilter, Converter={StaticResource Is}, ConverterParameter=All}"/>
+                                        <RadioButton Style="{StaticResource Segment}" Content="↑ 보냄" GroupName="Direction"
+                                                     IsChecked="{Binding DirectionFilter, Converter={StaticResource Is}, ConverterParameter=Out}"/>
+                                        <RadioButton Style="{StaticResource Segment}" Content="↓ 받음" GroupName="Direction"
+                                                     IsChecked="{Binding DirectionFilter, Converter={StaticResource Is}, ConverterParameter=In}"/>
+                                    </StackPanel>
+                                </Border>
                                 <TextBlock Text="표시 필터" Foreground="{StaticResource FgDim}" Margin="0,0,8,0"
                                            VerticalAlignment="Center"/>
                                 <Button DockPanel.Dock="Right" Content="필터 지우기" Command="{Binding ClearFilterCommand}"
                                         Margin="6,0,0,0"/>
                                 <TextBox Text="{Binding FilterText, UpdateSourceTrigger=PropertyChanged, Delay=300}"
-                                         ToolTip="공백으로 나눈 단어가 모두 맞는 패킷만 보입니다. !단어 = 제외, id:대상 = 그 대상만, 이상 = 문제 패킷만. 예) MC !192.168.0.5"/>
+                                         ToolTip="공백으로 나눈 단어가 모두 맞는 패킷만 보입니다. !단어 = 제외, id:대상 = 그 대상만, 이상 = 문제 패킷만. 보냄/받음 = 방향. 예) MC !192.168.0.5"/>
                             </DockPanel>
 
                             <TextBlock Grid.Row="1" Panel.ZIndex="1" HorizontalAlignment="Center" VerticalAlignment="Center"
@@ -516,6 +556,20 @@
                                     </Style>
                                 </DataGrid.RowStyle>
                                 <DataGrid.Columns>
+                                    <DataGridTextColumn Header="방향" Binding="{Binding DirectionText}" Width="70">
+                                        <DataGridTextColumn.ElementStyle>
+                                            <Style TargetType="TextBlock">
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding Direction}" Value="Out">
+                                                        <Setter Property="Foreground" Value="#FF4FC1FF"/>
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding Direction}" Value="In">
+                                                        <Setter Property="Foreground" Value="#FF89D185"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </DataGridTextColumn.ElementStyle>
+                                    </DataGridTextColumn>
                                     <DataGridTextColumn Header="No" Binding="{Binding Number}" Width="70"
                                                         ElementStyle="{StaticResource RightAligned}"/>
                                     <DataGridTextColumn Header="시간" Binding="{Binding Time, StringFormat=HH:mm:ss.fff}" Width="115"/>

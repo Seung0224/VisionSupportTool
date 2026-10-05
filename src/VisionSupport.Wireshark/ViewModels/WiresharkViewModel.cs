@@ -95,6 +95,9 @@ public sealed partial class WiresharkViewModel : ObservableObject, IDisposable
 
     [ObservableProperty] private NicInfo? _selectedNic;
     [ObservableProperty] private string _filterText = string.Empty;
+
+    /// <summary>전체 / 보냄 / 받음, on top of the filter text and the selected peer.</summary>
+    [ObservableProperty] private DirectionFilter _directionFilter;
     [ObservableProperty] private Packet? _selectedPacket;
     [ObservableProperty] private IReadOnlyList<ProtocolNode>? _selectedLayers;
     [ObservableProperty] private string _hexDump = string.Empty;
@@ -145,6 +148,8 @@ public sealed partial class WiresharkViewModel : ObservableObject, IDisposable
     }
 
     partial void OnFilterTextChanged(string value) => RebuildRows();
+
+    partial void OnDirectionFilterChanged(DirectionFilter value) => RebuildRows();
 
     partial void OnSelectedPacketChanged(Packet? value)
     {
@@ -406,7 +411,7 @@ public sealed partial class WiresharkViewModel : ObservableObject, IDisposable
 
     private void DrainIncoming()
     {
-        var filter = new PacketFilter(FilterText);
+        var filter = new PacketFilter(FilterText, DirectionFilter);
         for (int i = 0; i < MaxDrainPerTick && _incoming.TryDequeue(out Packet? p); i++)
         {
             if (filter.Matches(p)) Rows.Add(p);
@@ -426,7 +431,7 @@ public sealed partial class WiresharkViewModel : ObservableObject, IDisposable
 
     private void RebuildRows()
     {
-        var filter = new PacketFilter(FilterText);
+        var filter = new PacketFilter(FilterText, DirectionFilter);
         List<Packet> matching = _packets.Snapshot().Where(filter.Matches).ToList();
         Rows = new ObservableCollection<Packet>(matching.Skip(Math.Max(0, matching.Count - MaxRows)));
     }

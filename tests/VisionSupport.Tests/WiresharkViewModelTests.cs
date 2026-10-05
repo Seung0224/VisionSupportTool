@@ -178,4 +178,15 @@ public class WiresharkViewModelTests
         vm.SelectedNic = new NicInfo(9, "34-5A-60-86-4C-F3", "PLC", true);
         Assert.Equal("PLC 연결의 상대", vm.PeerHeader);
     });
+
+    [Fact]
+    public void The_direction_switch_starts_on_everything() => _app.Run(() =>
+    {
+        using var dir = new TempDir();
+        using var vm = new WiresharkViewModel(new WiresharkSettingsStore(Path.Combine(dir.Path, "s.json")), new ManualClock());
+
+        Assert.Equal(DirectionFilter.All, vm.DirectionFilter);
+        vm.DirectionFilter = DirectionFilter.Out;
+        Assert.Equal(DirectionFilter.Out, vm.DirectionFilter);
+    });
 }

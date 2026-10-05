@@ -100,4 +100,33 @@ public class WiresharkViewModelPartsTests
         Assert.Equal("TCP 443", card.Detail);
         Assert.True(card.CanPin);
     }
+
+    private static Packet WithDirection(PacketDirection direction)
+    {
+        Packet p = Mc();
+        p.Direction = direction;
+        return p;
+    }
+
+    [Theory]
+    [InlineData(DirectionFilter.All, true, true, true)]
+    [InlineData(DirectionFilter.Out, true, false, false)]
+    [InlineData(DirectionFilter.In, false, true, false)]
+    public void The_direction_switch_keeps_only_sent_or_received(DirectionFilter direction, bool sent, bool received, bool none)
+    {
+        var f = new PacketFilter("", direction);
+
+        Assert.Equal(sent, f.Matches(WithDirection(PacketDirection.Out)));
+        Assert.Equal(received, f.Matches(WithDirection(PacketDirection.In)));
+        Assert.Equal(none, f.Matches(WithDirection(PacketDirection.None)));
+    }
+
+    [Fact]
+    public void Direction_words_work_in_the_filter_box_and_combine_with_others()
+    {
+        Assert.True(new PacketFilter("보냄 MC").Matches(WithDirection(PacketDirection.Out)));
+        Assert.False(new PacketFilter("보냄 MC").Matches(WithDirection(PacketDirection.In)));
+        Assert.True(new PacketFilter("받음").Matches(WithDirection(PacketDirection.In)));
+        Assert.False(new PacketFilter("받음 ARP").Matches(WithDirection(PacketDirection.In)));
+    }
 }

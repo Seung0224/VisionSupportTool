@@ -17,6 +17,9 @@ public enum MessageRole { Request, Response, Unsolicited }
 /// <summary>What the application layer said, reduced to what the health tracker needs.</summary>
 public sealed record AppMessage(AppKind Kind, MessageRole Role, uint? CorrelationId, string Summary, bool IsError);
 
+/// <summary>Whether this PC sent the packet (out) or received it (in), judged by its own IP addresses.</summary>
+public enum PacketDirection { None, Out, In }
+
 public enum GvspFormat : byte { Unknown = 0, Leader = 1, Trailer = 2, Payload = 3, AllIn = 4, H264 = 5, MultiZone = 6 }
 
 public sealed record GvspHeader(ulong BlockId, uint PacketId, GvspFormat Format, ushort Status, bool ExtendedId);
@@ -79,6 +82,17 @@ public sealed class Packet
 
     /// <summary>Windows name of the NIC the frame came through ("PLC", "이더넷 2"), when known.</summary>
     public string? Interface { get; set; }
+
+    /// <summary>Set by the health tracker from this PC's addresses. None for ARP and other non-IP frames.</summary>
+    public PacketDirection Direction { get; set; }
+
+    /// <summary>The 방향 column.</summary>
+    public string DirectionText => Direction switch
+    {
+        PacketDirection.Out => "↑ 보냄",
+        PacketDirection.In => "↓ 받음",
+        _ => string.Empty,
+    };
 
     /// <summary>Which watched target this belongs to; set by the health tracker.</summary>
     public string? TargetId { get; set; }

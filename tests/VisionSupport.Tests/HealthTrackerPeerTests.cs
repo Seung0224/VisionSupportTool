@@ -118,4 +118,18 @@ public class HealthTrackerPeerTests
 
         Assert.Empty(tracker.Snapshot());
     }
+
+    [Fact]
+    public void Every_packet_learns_whether_this_pc_sent_or_received_it()
+    {
+        Packet sent = Send(TestFrames.Tcp(Me, 50000, "142.250.1.1", 443, new byte[10]));
+        Packet received = Send(TestFrames.Tcp("142.250.1.1", 443, Me, 50000, new byte[10]));
+        Packet arp = Send(TestFrames.Arp(Me, "192.168.0.1"));
+        Packet broadcast = Send(TestFrames.Udp(Me, 50000, "255.255.255.255", 1900, new byte[4]));
+
+        Assert.Equal(PacketDirection.Out, sent.Direction);
+        Assert.Equal(PacketDirection.In, received.Direction);
+        Assert.Equal(PacketDirection.None, arp.Direction);
+        Assert.Equal(PacketDirection.Out, broadcast.Direction);
+    }
 }

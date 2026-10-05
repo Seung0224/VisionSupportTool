@@ -102,6 +102,9 @@ public sealed partial class HealthTracker
     {
         lock (_gate)
         {
+            if (packet.SrcIp is not null && _local.Contains(packet.SrcIp)) packet.Direction = PacketDirection.Out;
+            else if (packet.DstIp is not null && _local.Contains(packet.DstIp)) packet.Direction = PacketDirection.In;
+
             TargetState? target = Resolve(packet);
             if (target is null) return;
 
