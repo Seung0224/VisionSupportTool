@@ -5,7 +5,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## 이 프로젝트
 
 VISION 개발 중 상시 띄워두는 사내 보조 도구. 하나의 WPF 프로세스가 여러 기능을
-`IFeatureModule`로 호스팅한다 (PLC 서버, 메모리 모니터, 이미지 변환기, 통신 모니터, SAM 화면 누끼).
+`IFeatureModule`로 호스팅한다 (PLC 서버, 메모리 모니터, 이미지 변환기, 통신 모니터).
 전체 배경·설계 이유·UX 구조는 [README.md](README.md)에 상세히 있으므로 먼저 읽을 것 — 특히
 "화면 구조", "기능 모듈 계약", "불투명도와 둥근 모서리" 절은 이 저장소를 건드리기 전에
 필수로 이해해야 하는 제약을 담고 있다.
@@ -17,8 +17,8 @@ dotnet build VisionSupport.sln
 src\VisionSupport\bin\Debug\net9.0-windows\VisionSupport.exe   # 관리자 권한 필요 (app.manifest)
 
 dotnet test tests\VisionSupport.Tests
-dotnet test tests\VisionSupport.Tests --filter "FullyQualifiedName~SamMaskTests"   # 단일 테스트 클래스
-dotnet test tests\VisionSupport.Tests --filter "FullyQualifiedName~SamMaskTests.A_negative_object_score_means_nothing_is_there"  # 단일 테스트
+dotnet test tests\VisionSupport.Tests --filter "FullyQualifiedName~RadialLayoutTests"   # 단일 테스트 클래스
+dotnet test tests\VisionSupport.Tests --filter "FullyQualifiedName~RadialLayoutTests.<테스트 메서드명>"  # 단일 테스트
 
 dotnet publish src\VisionSupport -p:PublishProfile=win-x64   # dist\ 에 self-contained 단일 exe
 ```
@@ -40,7 +40,7 @@ dotnet publish src\VisionSupport -p:PublishProfile=win-x64   # dist\ 에 self-co
 
 **셸/기능 경계.** `src/VisionSupport`가 셸(런처 아이콘, 방사형 메뉴, 기능 창)이고, 각 기능은
 독립된 클래스 라이브러리 프로젝트(`VisionSupport.PlcServer`, `.MemoryMonitor`,
-`.ImageConverter`, `.Sam`, `.Wireshark`)로 존재한다. 의존 방향은 항상 셸 → 기능 한쪽뿐이다
+`.ImageConverter`, `.Wireshark`)로 존재한다. 의존 방향은 항상 셸 → 기능 한쪽뿐이다
 (`VisionSupport.csproj`에 `ProjectReference`가 몰려 있고, 반대 방향 참조는 없음). 기능은
 `FeatureModule`(`src/VisionSupport/Features/FeatureModule.cs`)을 상속해 `IFeatureModule`을
 구현하며, 셸과의 접점은 이 인터페이스뿐이다. 새 기능을 추가할 때는 `App.xaml.cs`의
@@ -52,10 +52,6 @@ dotnet publish src\VisionSupport -p:PublishProfile=win-x64   # dist\ 에 self-co
 `IsWorking`으로 판단한다. `StopAsync`는 절대 예외를 밖으로 던지지 않고 실패 시
 `FeatureState.Faulted`로만 표시한다 — 셸은 며칠씩 켜져 있는 게 전제라, 기능 하나가 죽어도
 프로세스 전체가 죽으면 안 된다는 게 이 클래스 전체의 설계 이유다.
-
-SAM 누끼 도구(`VisionSupport.Sam`)는 `IFeatureModule`이 아니라 `LauncherViewModel`에서 직접
-모드로 진입한다 — 창을 여는 다른 기능들과 달리 화면 전체를 덮는 라이브 캡처 오버레이이기
-때문이다. 설계와 측정값은 `docs/superpowers/specs/2026-09-15-sam-cutout-design.md`.
 
 **PLC 서버 내부.** `VisionSupport.PlcServer`는 이 솔루션으로 포팅되기 전 이름
 (`VirtualPlcServer`)의 네임스페이스를 아직 쓴다(`Modules/`, `Protocols/` 아래 다수 파일이

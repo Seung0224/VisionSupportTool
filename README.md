@@ -10,7 +10,7 @@ VisionSupport.sln
    ├─ VisionSupport.MemoryMonitor         구 모니터링/MemMon   (클래스 라이브러리)
    ├─ VisionSupport.PlcServer             구 Server/VirtualPlcServer (클래스 라이브러리)
    ├─ VisionSupport.ImageConverter        이미지 변환기 (클래스 라이브러리)
-   └─ VisionSupport.Sam                   누끼 — SAM 2.1 화면 분할 (클래스 라이브러리)
+   └─ VisionSupport.Wireshark             통신 모니터 (클래스 라이브러리)
 ```
 
 ## 원본 프로젝트에 대해
@@ -38,30 +38,13 @@ VisionSupport.sln
 
 ```
 LauncherWindow            상시 · Topmost · 작업표시줄 미표시
- ├ 좌클릭 → 방사형 메뉴    도구 · 이미지 변환기 · 링크 · 폴더 · 전체보기  (누끼는 현재 비활성화: LauncherViewModel.CutoutEnabled)
- │  ├ 도구 → 3×3 상자     메모리 모니터 · PLC 서버 · 통신 모니터
- │  └ 누끼 → 화면 막       마우스 아래 대상 강조 · 휠 위/아래 전체/부분 · 좌클릭 따기 · 우클릭/Esc 취소
+ ├ 좌클릭 → 방사형 메뉴    도구 · 이미지 변환기 · 링크 · 폴더 · 전체보기
+ │  └ 도구 → 3×3 상자     메모리 모니터 · PLC 서버 · 통신 모니터
  └ 우클릭 → 컨텍스트 메뉴  전체보기 · 종료
 
 FeatureWindow × N         기능을 누르면 생성, 닫으면 소멸
-CutoutViewer × N          누끼를 딸 때마다 생성 · 우클릭 복사/저장
 OverviewDialog × 1        프로세스 자원 · 기능별 상태 · 불투명도
 ```
-
-누끼는 SAM 3 (tracker ONNX, fp16) 를 ONNX Runtime DirectML 로 GPU 에서 돌린다. 모델(약 900MB)은 처음 쓸 때
-`%AppData%\VisionSupport\Sam\` 로 내려받는다. 모드 중 화면은 멈춘 캡처가 아니라 라이브다 — 모니터마다
-불투명한 막 창이 캡처 제외(`WDA_EXCLUDEFROMCAPTURE`)로 뜨고, 그 아래 실제 화면을 계속 캡처해 어둡게 다시
-그린다(반투명 창은 캡처 제외가 거부된다). 커서 주변 1008×1008 을 원본 해상도로 분석하므로 그보다 큰 대상은
-가장자리에서 잘린다. 인코딩(약 0.4초)과 디코딩(약 10ms)은 스레드가 따로라서, 마우스 반응은 인코딩을 기다리지
-않는다. 큰 버퍼는 모드 시작 때 한 번만 만들어 재사용하고, 모드가 끝나면 모두 해제한 뒤 바로 수집한다.
-모드 중에는 RAM 약 3GB, GPU 약 2.6GB 를 쓴다.
-디코더가 내는 마스크 3개 중 무엇을 보여줄지는 모델 점수가 아니라 면적 순으로 고른다 — 점수 순이면 사람 전체보다
-상의·얼굴 같은 부분이 뽑힌다. 기본은 가장 큰 마스크이고 휠로 작은 단위로 내려간다(점수 0.5 미만은 제외).
-보여주거나 자르기 전에 커서 아래 덩어리만 남기고, 그 면적의 1% 보다 작은 구멍은 메운다. 지금 몇 단계인지는
-커서 오른쪽 위에 작게 뜨는 "1/3" 같은 숫자(지수 형태)로 알 수 있다 — 분모는 실제로 신뢰되는 마스크 개수라서
-대상에 따라 3보다 작을 수 있고, 휠은 그 범위 안에서만 움직인다. `onnxruntime.dll` 이 System32 의 구형 DirectML 1.0 을 잡으면 GPU 세션이 실패하므로,
-세션 전에 앱에 딸린 DirectML.dll 을 먼저 로드한다. 설계와 측정값은
-`docs/superpowers/specs/2026-09-15-sam-cutout-design.md`.
 
 이 구조의 핵심은 **"창"과 "실행"이 다른 것**이라는 점이다. 예전 셸은 페이지에 한 번 들어가면
 뷰와 ViewModel을 프로세스가 끝날 때까지 들고 있었고, 그래서 실행 여부와 자원 점유가 무관했다.

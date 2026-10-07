@@ -20,7 +20,6 @@
     <ProjectReference Include="..\..\src\VisionSupport.PlcServer\VisionSupport.PlcServer.csproj" />
     <ProjectReference Include="..\..\src\VisionSupport.MemoryMonitor\VisionSupport.MemoryMonitor.csproj" />
     <ProjectReference Include="..\..\src\VisionSupport.ImageConverter\VisionSupport.ImageConverter.csproj" />
-    <ProjectReference Include="..\..\src\VisionSupport.Sam\VisionSupport.Sam.csproj" />
     <ProjectReference Include="..\..\src\VisionSupport.Wireshark\VisionSupport.Wireshark.csproj" />
     <ProjectReference Include="..\..\src\VisionSupport\VisionSupport.csproj" />
   </ItemGroup>

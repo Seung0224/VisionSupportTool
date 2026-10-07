@@ -35,7 +35,6 @@
     <ProjectReference Include="..\VisionSupport.MemoryMonitor\VisionSupport.MemoryMonitor.csproj" />
     <ProjectReference Include="..\VisionSupport.PlcServer\VisionSupport.PlcServer.csproj" />
     <ProjectReference Include="..\VisionSupport.ImageConverter\VisionSupport.ImageConverter.csproj" />
-    <ProjectReference Include="..\VisionSupport.Sam\VisionSupport.Sam.csproj" />
     <ProjectReference Include="..\VisionSupport.Wireshark\VisionSupport.Wireshark.csproj" />
   </ItemGroup>
 

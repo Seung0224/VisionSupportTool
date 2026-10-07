@@ -7,7 +7,6 @@ using CommunityToolkit.Mvvm.Input;
 using VisionSupport.Archive;
 using VisionSupport.Features;
 using VisionSupport.Overview;
-using VisionSupport.Sam;
 using VisionSupport.Shell;
 using VisionSupport.Windows;
 
@@ -104,9 +103,9 @@ public sealed partial class LauncherViewModel : ObservableObject
         // ring out of usefulness. The folder tile opens a list of its own instead.
         bool hasFolders = FolderLinks.Count > 0;
 
-        // Always there: the tools tile and the overview (and the cutout tile, while it is enabled).
+        // Always there: the tools tile and the overview.
         Point[] offsets = RadialLayout.Offsets(
-            _ringModules.Count + WebLinks.Count + (hasFolders ? 1 : 0) + (CutoutEnabled ? 3 : 2), Appearance.MenuRadius);
+            _ringModules.Count + WebLinks.Count + (hasFolders ? 1 : 0) + 2, Appearance.MenuRadius);
 
         // A tile is the whole item now, so both axes centre on the tile.
         double centre = Appearance.MenuSize / 2 - Appearance.TileSize / 2;
@@ -127,13 +126,6 @@ public sealed partial class LauncherViewModel : ObservableObject
             Point at = offsets[slot++];
             Items.Add(new LauncherItem(module.Glyph, module.Title,
                 centreX + at.X, centreY + at.Y, () => Open(module), module));
-        }
-
-        // A mode rather than a window: the screen dims and whatever is under the cursor can be cut out.
-        if (CutoutEnabled)
-        {
-            Point cutoutAt = offsets[slot++];
-            Items.Add(new LauncherItem("ContentCut", "누끼", centreX + cutoutAt.X, centreY + cutoutAt.Y, StartCutout));
         }
 
         foreach (LauncherLink link in WebLinks)
@@ -391,37 +383,6 @@ public sealed partial class LauncherViewModel : ObservableObject
         => _activity.Add("드롭", accepted
             ? $"항목 {fileCount}개 감지"
             : fileCount == 0 ? "파일이 아닌 내용" : "작업 중이라 거부");
-
-    /// <summary>
-    /// Runs the cutout mode and shows what it picked beside the point it was picked at.
-    ///
-    /// The menu shuts at once rather than animating out: the overlay paints a live capture of the
-    /// screen, and a menu caught half-way through closing would be in it.
-    /// </summary>
-    /// <summary>
-    /// The SAM cutout tile is switched off in this build: its model download and GPU load are
-    /// more than the tool needs right now. The code stays; set this to true to bring the tile back.
-    /// </summary>
-    private static readonly bool CutoutEnabled = false;
-
-    private async void StartCutout()
-    {
-        CollapseNowRequested?.Invoke(this, EventArgs.Empty);
-
-        CutoutResult result = await CutoutSession.RunAsync(new ModelStore());
-
-        if (result is { End: CutoutEnd.Picked, Image: { } image })
-        {
-            new CutoutViewer(image).ShowNear(result.CursorX, result.CursorY);
-            _activity.Add("누끼", $"따기 {image.Width}×{image.Height}");
-        }
-        else if (result.End == CutoutEnd.Failed)
-        {
-            string error = result.Error ?? "알 수 없는 오류";
-            _activity.Add("누끼", error);
-            MessageBox.Show(error, "누끼", MessageBoxButton.OK, MessageBoxImage.Warning);
-        }
-    }
 
     private void OnModuleChanged(object? sender, EventArgs e)
     {
