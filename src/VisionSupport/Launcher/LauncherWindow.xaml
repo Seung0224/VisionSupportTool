@@ -300,20 +300,23 @@
                 <ScaleTransform x:Name="FabZoom" ScaleX="1" ScaleY="1"/>
             </Grid.RenderTransform>
 
-            <!-- No shadow here either; see the tile template for why. -->
-            <Ellipse Fill="{Binding Appearance.IconBrush}"
-                     Stroke="{Binding Appearance.IconEdgeBrush}" StrokeThickness="2"/>
+            <!-- No shadow here either; see the tile template for why. A rounded square with the
+                 same radius as the menu tiles, so the icon and its tiles read as one family. -->
+            <Rectangle Fill="{Binding Appearance.IconBrush}" RadiusX="18" RadiusY="18"
+                       Stroke="{Binding Appearance.IconEdgeBrush}" StrokeThickness="2"/>
 
             <!-- Lights up while something is held over the icon. A white wash rather than a
                  second colour, so it follows whatever hue the user picked. -->
-            <Ellipse x:Name="DropGlow" Fill="White" Opacity="0"/>
+            <Rectangle x:Name="DropGlow" Fill="White" Opacity="0" RadiusX="18" RadiusY="18"/>
 
-            <Ellipse Stroke="{StaticResource StateRunning}" StrokeThickness="2.5" Margin="1"
-                     Visibility="{Binding AnyRunning, Converter={StaticResource BoolToVis}}"/>
+            <Rectangle Stroke="{StaticResource StateRunning}" StrokeThickness="2.5" Margin="1"
+                       RadiusX="17" RadiusY="17"
+                       Visibility="{Binding AnyRunning, Converter={StaticResource BoolToVis}}"/>
 
             <!-- Drawn over the green ring, so "something is wrong" wins over "something is up". -->
-            <Ellipse Stroke="{StaticResource StateFaulted}" StrokeThickness="2.5" Margin="1"
-                     Visibility="{Binding AnyAlert, Converter={StaticResource BoolToVis}}"/>
+            <Rectangle Stroke="{StaticResource StateFaulted}" StrokeThickness="2.5" Margin="1"
+                       RadiusX="17" RadiusY="17"
+                       Visibility="{Binding AnyAlert, Converter={StaticResource BoolToVis}}"/>
 
             <!-- VISION's V. Rotating it to a caret on expand is the open/close affordance; it is
                  also the only moving part that tells you the menu heard the click. -->

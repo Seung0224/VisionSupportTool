@@ -105,8 +105,9 @@
                          being dragged blind against an icon that may be behind this dialog. -->
                     <Grid Grid.Column="0" Grid.RowSpan="4" Width="52" Height="52"
                           Margin="0,0,14,0" VerticalAlignment="Center">
-                        <Ellipse Fill="{Binding IconBrush}" Stroke="{Binding IconEdgeBrush}"
-                                 StrokeThickness="1" Opacity="{Binding IconOpacity}"/>
+                        <Rectangle Fill="{Binding IconBrush}" Stroke="{Binding IconEdgeBrush}"
+                                   RadiusX="14" RadiusY="14"
+                                   StrokeThickness="1" Opacity="{Binding IconOpacity}"/>
                         <TextBlock Text="V" FontFamily="Segoe UI" FontWeight="Black" FontSize="22"
                                    Foreground="White" Opacity="{Binding IconOpacity}"
                                    HorizontalAlignment="Center" VerticalAlignment="Center"/>
