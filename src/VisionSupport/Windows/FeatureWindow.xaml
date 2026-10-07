@@ -43,6 +43,7 @@
                         <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
 
                     <Ellipse x:Name="StateDot" Grid.Column="0" Width="9" Height="9"
@@ -55,7 +56,13 @@
                                Foreground="{StaticResource FgDim}" FontSize="12"
                                TextTrimming="CharacterEllipsis"/>
 
-                    <StackPanel Grid.Column="3" Orientation="Horizontal"
+                    <!-- The feature's own caption controls (IFeatureModule.CreateCaptionTools), if any.
+                         They sit in the drag area, so they have to opt out of the chrome's hit testing. -->
+                    <ContentPresenter x:Name="CaptionTools" Grid.Column="3" Margin="0,0,10,0"
+                                      VerticalAlignment="Center"
+                                      chrome:WindowChrome.IsHitTestVisibleInChrome="True"/>
+
+                    <StackPanel Grid.Column="4" Orientation="Horizontal"
                                 chrome:WindowChrome.IsHitTestVisibleInChrome="True">
                         <Button x:Name="MinimizeButton" Style="{StaticResource TitleBarButton}"
                                 Content="&#xE921;" ToolTip="최소화"/>

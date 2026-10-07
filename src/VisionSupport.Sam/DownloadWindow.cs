@@ -39,6 +39,7 @@ internal sealed class DownloadWindow : Window
         };
 
         Progress = new Progress<double>(value => _bar.Value = value);
+        Closed += (_, _) => AutomationDisconnect.Disconnect(this);
     }
 
     /// <summary>Created on the UI thread, so reports from the download's thread land back here.</summary>

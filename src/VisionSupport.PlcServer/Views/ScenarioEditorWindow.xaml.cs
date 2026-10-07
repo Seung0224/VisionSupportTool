@@ -11,6 +11,7 @@ namespace VirtualPlcServer.Views
             InitializeComponent();
             Title = module.Name + " (Scenario)";
             DataContext = new ScenarioEditorViewModel(module);
+            Closed += (_, _) => AutomationDisconnect.Disconnect(this);
         }
     }
 }

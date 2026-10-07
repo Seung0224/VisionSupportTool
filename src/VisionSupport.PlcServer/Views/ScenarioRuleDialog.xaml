@@ -8,7 +8,7 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              mc:Ignorable="d"
              d:DataContext="{d:DesignInstance vm:ScenarioRuleDialogViewModel}"
-             Width="440" MaxHeight="680">
+             Width="480" MaxHeight="720">
     <!-- Built with `new` and shown through DialogHost, so it has no parent to inherit the
          feature's scoped theme from at parse time. It merges the theme itself. -->
     <UserControl.Resources>
@@ -24,7 +24,7 @@
 
     <ScrollViewer VerticalScrollBarVisibility="Auto">
         <StackPanel Margin="20">
-            <TextBlock Text="ADD RULE" FontSize="18" FontWeight="Bold" Margin="0,0,0,16" />
+            <TextBlock Text="{Binding Title}" FontSize="18" FontWeight="Bold" Margin="0,0,0,16" />
 
             <ComboBox materialDesign:HintAssist.Hint="Trigger" SelectedIndex="{Binding TriggerKindIndex}" Margin="0,0,0,8">
                 <ComboBoxItem Content="On Value Change" />
@@ -35,42 +35,10 @@
             <!-- Watch target (On Value Change / On Value Compare) -->
             <StackPanel Visibility="{Binding IsWatchNeeded, Converter={StaticResource BooleanToVisibilityConverter}}">
                 <TextBlock Text="WHEN" FontWeight="Bold" FontSize="11" Foreground="Gray" Margin="0,8,0,4" />
-                <ComboBox materialDesign:HintAssist.Hint="Module" ItemsSource="{Binding AvailableModules}"
-                          DisplayMemberPath="Name" SelectedItem="{Binding SelectedWatchModule}" Margin="0,4" />
-
-                <!-- OPC UA/ADS: pick a node from the module's actual node list -->
-                <ComboBox materialDesign:HintAssist.Hint="Node"
-                          Visibility="{Binding IsWatchNodeBased, Converter={StaticResource BooleanToVisibilityConverter}}"
-                          ItemsSource="{Binding WatchModuleNodes}" DisplayMemberPath="Name"
-                          SelectedItem="{Binding SelectedWatchNode}" Margin="0,4" />
-
-                <!-- MC: type the D-address -->
-                <TextBox materialDesign:HintAssist.Hint="Address (D-number)"
-                         Visibility="{Binding IsWatchNodeBased, Converter={StaticResource InverseBooleanToVisibilityConverter}}"
-                         Text="{Binding WatchAddress}" Margin="0,4" />
-
-                <TextBox materialDesign:HintAssist.Hint="Array Index"
-                         Visibility="{Binding IsWatchArraySelected, Converter={StaticResource BooleanToVisibilityConverter}}"
-                         Text="{Binding WatchArrayIndex}" Margin="0,4" />
-
-                <StackPanel Orientation="Horizontal"
-                            Visibility="{Binding IsCompareNeeded, Converter={StaticResource BooleanToVisibilityConverter}}">
-                    <ComboBox materialDesign:HintAssist.Hint="Operator" SelectedIndex="{Binding OperatorIndex}"
-                              Width="100" Margin="0,4,8,4">
-                        <ComboBoxItem Content="==" />
-                        <ComboBoxItem Content="!=" />
-                        <ComboBoxItem Content="&gt;" />
-                        <ComboBoxItem Content="&gt;=" />
-                        <ComboBoxItem Content="&lt;" />
-                        <ComboBoxItem Content="&lt;=" />
-                    </ComboBox>
-                    <TextBox materialDesign:HintAssist.Hint="Value"
-                             Visibility="{Binding IsWatchStringSelected, Converter={StaticResource InverseBooleanToVisibilityConverter}}"
-                             Text="{Binding CompareValue}" Width="140" Margin="0,4" />
-                    <TextBox materialDesign:HintAssist.Hint="Text"
-                             Visibility="{Binding IsWatchStringSelected, Converter={StaticResource BooleanToVisibilityConverter}}"
-                             Text="{Binding CompareText}" Width="140" Margin="0,4" />
-                </StackPanel>
+                <local:TargetPicker DataContext="{Binding Watch}" />
+                <ContentControl Visibility="{Binding IsCompareNeeded, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <local:ComparisonEditor DataContext="{Binding Comparison}" />
+                </ContentControl>
             </StackPanel>
 
             <!-- Timer -->
@@ -79,29 +47,43 @@
                 <TextBox materialDesign:HintAssist.Hint="Interval (seconds)" Text="{Binding TimerIntervalSeconds}" Margin="0,4" />
             </StackPanel>
 
+            <!-- Extra conditions: AND for value triggers, a filter for the timer -->
+            <ItemsControl ItemsSource="{Binding Conditions}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate DataType="{x:Type vm:ScenarioConditionRowViewModel}">
+                        <Border BorderBrush="{StaticResource AppBorderBrush}" BorderThickness="1" CornerRadius="4"
+                                Padding="8,4,8,8" Margin="0,8,0,0">
+                            <StackPanel>
+                                <DockPanel>
+                                    <Button DockPanel.Dock="Right" Command="{Binding RemoveCommand}"
+                                            Style="{StaticResource MaterialDesignIconButton}"
+                                            Width="24" Height="24" Padding="0" ToolTip="Remove Condition">
+                                        <TextBlock Text="✕" FontSize="11" />
+                                    </Button>
+                                    <TextBlock Text="{Binding DataContext.ConditionsHeader, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                               FontWeight="Bold" FontSize="11" Foreground="Gray" VerticalAlignment="Center" />
+                                </DockPanel>
+                                <local:TargetPicker DataContext="{Binding Target}" />
+                                <local:ComparisonEditor DataContext="{Binding Comparison}" />
+                            </StackPanel>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <Button Content="+ CONDITION" Command="{Binding AddConditionCommand}"
+                    Style="{StaticResource MaterialDesignFlatButton}" HorizontalAlignment="Left" Margin="0,8,0,0"
+                    ToolTip="Add a condition that must also hold (AND). On a timer rule, the rule only runs while all of them hold." />
+
             <!-- Action -->
             <TextBlock Text="THEN WRITE" FontWeight="Bold" FontSize="11" Foreground="Gray" Margin="0,12,0,4" />
-            <ComboBox materialDesign:HintAssist.Hint="Module" ItemsSource="{Binding AvailableModules}"
-                      DisplayMemberPath="Name" SelectedItem="{Binding SelectedActionModule}" Margin="0,4" />
-
-            <ComboBox materialDesign:HintAssist.Hint="Node"
-                      Visibility="{Binding IsActionNodeBased, Converter={StaticResource BooleanToVisibilityConverter}}"
-                      ItemsSource="{Binding ActionModuleNodes}" DisplayMemberPath="Name"
-                      SelectedItem="{Binding SelectedActionNode}" Margin="0,4" />
-
-            <TextBox materialDesign:HintAssist.Hint="Address (D-number)"
-                     Visibility="{Binding IsActionNodeBased, Converter={StaticResource InverseBooleanToVisibilityConverter}}"
-                     Text="{Binding ActionAddress}" Margin="0,4" />
-
-            <TextBox materialDesign:HintAssist.Hint="Array Index"
-                     Visibility="{Binding IsActionArraySelected, Converter={StaticResource BooleanToVisibilityConverter}}"
-                     Text="{Binding ActionArrayIndex}" Margin="0,4" />
+            <local:TargetPicker DataContext="{Binding Action}" />
 
             <TextBox materialDesign:HintAssist.Hint="Value or expression (use 'value' for the trigger's value)"
-                     Visibility="{Binding IsActionStringSelected, Converter={StaticResource InverseBooleanToVisibilityConverter}}"
+                     Visibility="{Binding Action.IsStringSelected, Converter={StaticResource InverseBooleanToVisibilityConverter}}"
                      Text="{Binding ActionValueExpression}" Margin="0,4" />
             <TextBox materialDesign:HintAssist.Hint="Text to write"
-                     Visibility="{Binding IsActionStringSelected, Converter={StaticResource BooleanToVisibilityConverter}}"
+                     Visibility="{Binding Action.IsStringSelected, Converter={StaticResource BooleanToVisibilityConverter}}"
                      Text="{Binding ActionTextValue}" Margin="0,4" />
 
             <TextBlock Text="{Binding ErrorMessage}" Foreground="{StaticResource StatusStoppedBrush}"
@@ -111,7 +93,7 @@
                 <Button Content="CANCEL" Style="{StaticResource MaterialDesignFlatButton}"
                         Command="{x:Static materialDesign:DialogHost.CloseDialogCommand}"
                         Margin="0,0,8,0" />
-                <Button Content="ADD RULE" Click="OnAddClicked" Style="{StaticResource MaterialDesignRaisedButton}" />
+                <Button Content="{Binding ConfirmText}" Click="OnAddClicked" Style="{StaticResource MaterialDesignRaisedButton}" />
             </StackPanel>
         </StackPanel>
     </ScrollViewer>

@@ -104,6 +104,7 @@ internal sealed class CutoutOverlay : Window
         Content = root;
 
         SourceInitialized += (_, _) => PlaceAndExclude();
+        Closed += (_, _) => AutomationDisconnect.Disconnect(this);
     }
 
     /// <summary>True once Windows has agreed to leave this window out of captures. The session does

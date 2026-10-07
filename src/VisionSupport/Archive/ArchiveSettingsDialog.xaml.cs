@@ -2,6 +2,7 @@ using System.IO;
 using System.Windows;
 using Microsoft.Win32;
 using VisionSupport.Launcher;
+using VisionSupport.Shell;
 
 namespace VisionSupport.Archive;
 
@@ -36,6 +37,7 @@ public partial class ArchiveSettingsDialog : Window
 
         BrowseButton.Click += (_, _) => PickCopyTarget();
         CloseButton.Click += (_, _) => Close();
+        Closed += (_, _) => AutomationDisconnect.Disconnect(this);
     }
 
     private void PickCopyTarget()
@@ -52,6 +54,6 @@ public partial class ArchiveSettingsDialog : Window
     private void Store(Action change)
     {
         change();
-        _settings.Save(LauncherSettings.DefaultPath);
+        _settings.Save();
     }
 }

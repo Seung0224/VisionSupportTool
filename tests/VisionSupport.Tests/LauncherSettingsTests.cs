@@ -27,6 +27,38 @@ public class LauncherSettingsTests
     }
 
     [Fact]
+    public void Save_after_loading_writes_back_to_the_loaded_path()
+    {
+        using var dir = new TempDir();
+        string path = Path.Combine(dir.Path, "launcher.json");
+        new LauncherSettings { IconLeft = 10 }.Save(path);
+
+        LauncherSettings loaded = LauncherSettings.Load(path);
+        loaded.IconLeft = 999;
+        loaded.Save();
+
+        Assert.Equal(999, LauncherSettings.Load(path).IconLeft);
+    }
+
+    /// <summary>
+    /// A ViewModel test that builds a bare LauncherSettings and eventually calls Save() on it
+    /// (e.g. via LauncherAppearance) must never reach the real, shared file every running copy of
+    /// the app reads - that used to happen on every `dotnet test`, quietly resetting the user's
+    /// saved icon appearance and link list.
+    /// </summary>
+    [Fact]
+    public void Save_without_loading_first_does_not_touch_the_shared_default_file()
+    {
+        bool existedBefore = File.Exists(LauncherSettings.DefaultPath);
+        string? contentBefore = existedBefore ? File.ReadAllText(LauncherSettings.DefaultPath) : null;
+
+        new LauncherSettings().Save();
+
+        Assert.Equal(existedBefore, File.Exists(LauncherSettings.DefaultPath));
+        if (existedBefore) Assert.Equal(contentBefore, File.ReadAllText(LauncherSettings.DefaultPath));
+    }
+
+    [Fact]
     public void Missing_file_gives_defaults()
     {
         using var dir = new TempDir();

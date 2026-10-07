@@ -1,4 +1,5 @@
 using System.Windows.Controls;
+using System.Windows.Data;
 using VirtualPlcServer.ViewModels;
 
 namespace VirtualPlcServer.Views
@@ -19,6 +20,14 @@ namespace VirtualPlcServer.Views
         {
             InitializeComponent();
             DataContext = viewModel;
+
+            // The ADD MODULE item rides at the end of the module list, so it takes a card's or a row's
+            // place in whichever layout is showing. CompositeCollection forwards the list's changes.
+            Board.ItemsSource = new CompositeCollection
+            {
+                new CollectionContainer { Collection = viewModel.Modules },
+                new AddModuleTile()
+            };
         }
     }
 }

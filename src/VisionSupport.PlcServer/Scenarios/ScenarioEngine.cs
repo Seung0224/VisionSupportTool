@@ -12,6 +12,10 @@ namespace VirtualPlcServer.Scenarios
     /// <summary>
     /// 활성화된 시나리오들의 규칙을 실제로 실행하는 엔진. OnChange/OnCompare 규칙은 대상 모듈의
     /// Map.ValueChanged 이벤트를 구독해서 반응하고, OnTimer 규칙은 공용 타이머 하나로 처리한다.
+    /// OnCompare 규칙은 AND 추가 조건의 왼쪽 번지도 구독한다 - 카메라 같은 상대가 여러 워드를 어떤
+    /// 순서로 쓰든, 마지막 하나가 맞춰지는 순간 실행되게 하기 위해서다. 반면 비교 대상 번지(오른쪽,
+    /// CompareTarget)는 구독하지 않는다: 이쪽이 새 커맨드를 쓴 순간 상대가 아직 이전 사이클의 ACK를
+    /// 들고 있으면, 그 쓰기만으로 규칙이 실행돼 커맨드가 곧바로 지워지기 때문이다.
     /// </summary>
     public sealed class ScenarioEngine : IDisposable
     {
@@ -91,45 +95,60 @@ namespace VirtualPlcServer.Scenarios
                         continue;
                     }
 
-                    if (!modules.TryGetValue(rule.WatchTarget.ModuleId, out PlcServerModule watchModule))
-                    {
-                        continue;
-                    }
+                    Subscribe(modules, rule, rule.WatchTarget);
 
-                    ScenarioRule capturedRule = rule;
-                    PlcServerModule capturedModule = watchModule;
-                    EventHandler<MapValueChangedEventArgs> handler = (s, e) => OnValueChanged(capturedModule, capturedRule, e);
-                    watchModule.Server.Map.ValueChanged += handler;
-                    _subscriptions.Add((watchModule.Server.Map, handler));
+                    if (rule.Trigger == TriggerKind.OnCompare && rule.Conditions != null)
+                    {
+                        foreach (ScenarioCondition condition in rule.Conditions)
+                        {
+                            if (condition?.Target != null)
+                            {
+                                Subscribe(modules, rule, condition.Target);
+                            }
+                        }
+                    }
                 }
             }
         }
 
-        private void OnValueChanged(PlcServerModule watchModule, ScenarioRule rule, MapValueChangedEventArgs e)
+        private void Subscribe(Dictionary<Guid, PlcServerModule> modules, ScenarioRule rule, TargetRef watched)
         {
-            if (!AddressMatches(watchModule, rule.WatchTarget.Address, e.Key))
+            if (!modules.TryGetValue(watched.ModuleId, out PlcServerModule watchModule))
             {
                 return;
             }
 
-            // 배열 노드 전체가 바뀐 이벤트에서, 이 규칙이 특정 원소만 보고 있다면 그 원소만 꺼낸다.
-            object rawValue = ExtractElement(e.Value, rule.WatchTarget.ArrayIndex);
+            EventHandler<MapValueChangedEventArgs> handler = (s, e) => OnValueChanged(watchModule, watched, rule, e);
+            watchModule.Server.Map.ValueChanged += handler;
+            _subscriptions.Add((watchModule.Server.Map, handler));
+        }
 
-            bool conditionMet;
-            if (rule.Trigger == TriggerKind.OnChange)
+        /// <summary>watched는 규칙의 주 감시 대상이거나 AND 추가 조건 하나의 왼쪽 번지다.</summary>
+        private void OnValueChanged(PlcServerModule watchModule, TargetRef watched, ScenarioRule rule, MapValueChangedEventArgs e)
+        {
+            if (!AddressMatches(watchModule, watched.Address, e.Key))
             {
-                conditionMet = true;
-            }
-            else if (rawValue is string text)
-            {
-                conditionMet = CompareText(text, rule.Operator, rule.CompareText ?? string.Empty);
-            }
-            else
-            {
-                conditionMet = CompareNumeric(PlcTargetAccessor.ToDouble(rawValue), rule.Operator, rule.CompareValue);
+                return;
             }
 
-            if (!conditionMet)
+            // 주 감시 번지에서 온 이벤트면 이벤트 값을(배열 노드면 그 원소만), 추가 조건 번지에서 온 것이면
+            // 주 감시 번지의 현재 값을 읽어 주 조건을 평가한다.
+            bool fromWatchTarget = ReferenceEquals(watched, rule.WatchTarget);
+            object rawValue = fromWatchTarget
+                ? ExtractElement(e.Value, rule.WatchTarget.ArrayIndex)
+                : ConditionEvaluator.Read(rule.WatchTarget, FindModule);
+
+            if (rawValue == null)
+            {
+                return;
+            }
+
+            bool conditionMet = rule.Trigger == TriggerKind.OnChange
+                ? fromWatchTarget
+                : ConditionEvaluator.Compare(rawValue, rule.Operator, rule.CompareValue, rule.CompareText,
+                    rule.CompareTarget, FindModule);
+
+            if (!conditionMet || !ConditionEvaluator.AllMet(rule.Conditions, FindModule))
             {
                 return;
             }
@@ -155,7 +174,10 @@ namespace VirtualPlcServer.Scenarios
                     }
 
                     rule.ElapsedSeconds = 0;
-                    Fire(rule, 0);
+                    if (ConditionEvaluator.AllMet(rule.Conditions, FindModule))
+                    {
+                        Fire(rule, 0);
+                    }
                 }
             }
         }
@@ -167,7 +189,7 @@ namespace VirtualPlcServer.Scenarios
                 return;
             }
 
-            PlcServerModule actionModule = _plcModulesProvider().FirstOrDefault(m => m.Id == rule.ActionTarget.ModuleId);
+            PlcServerModule actionModule = FindModule(rule.ActionTarget.ModuleId);
             if (actionModule == null)
             {
                 return;
@@ -204,6 +226,11 @@ namespace VirtualPlcServer.Scenarios
             }
         }
 
+        private PlcServerModule FindModule(Guid id)
+        {
+            return _plcModulesProvider().FirstOrDefault(m => m.Id == id);
+        }
+
         private static object ExtractElement(object value, int? index)
         {
             if (index.HasValue && value is Array array && index.Value >= 0 && index.Value < array.Length)
@@ -223,35 +250,6 @@ namespace VirtualPlcServer.Scenarios
             }
 
             return string.Equals(eventKey, (configuredAddress ?? string.Empty).Trim(), StringComparison.OrdinalIgnoreCase);
-        }
-
-        private static bool CompareNumeric(double value, CompareOperator op, double compareValue)
-        {
-            switch (op)
-            {
-                case CompareOperator.Equals: return Math.Abs(value - compareValue) < 0.0001;
-                case CompareOperator.NotEquals: return Math.Abs(value - compareValue) >= 0.0001;
-                case CompareOperator.GreaterThan: return value > compareValue;
-                case CompareOperator.GreaterOrEqual: return value >= compareValue;
-                case CompareOperator.LessThan: return value < compareValue;
-                case CompareOperator.LessOrEqual: return value <= compareValue;
-                default: return false;
-            }
-        }
-
-        private static bool CompareText(string value, CompareOperator op, string compareValue)
-        {
-            int cmp = string.CompareOrdinal(value ?? string.Empty, compareValue ?? string.Empty);
-            switch (op)
-            {
-                case CompareOperator.Equals: return cmp == 0;
-                case CompareOperator.NotEquals: return cmp != 0;
-                case CompareOperator.GreaterThan: return cmp > 0;
-                case CompareOperator.GreaterOrEqual: return cmp >= 0;
-                case CompareOperator.LessThan: return cmp < 0;
-                case CompareOperator.LessOrEqual: return cmp <= 0;
-                default: return false;
-            }
         }
     }
 }

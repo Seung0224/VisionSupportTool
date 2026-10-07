@@ -33,6 +33,13 @@ public interface IFeatureModule
     event EventHandler? Changed;
 
     /// <summary>
+    /// Small controls the feature wants in its window's caption, right after <see cref="StatusLine"/> -
+    /// a view switch, say. Built once per window and dropped with it, so it must not hold anything
+    /// the feature needs to release. Null for none, which is what almost every feature returns.
+    /// </summary>
+    FrameworkElement? CreateCaptionTools();
+
+    /// <summary>
     /// The feature's screen. Created on first navigation and kept while the feature lives, so
     /// switching menus does not restart anything. Stopping discards it; navigating back after a
     /// stop builds a fresh one.

@@ -33,6 +33,25 @@ public class ViewConstructionTests
     public void ScenarioRuleDialog_constructs_detached() => OnStaThread(() => new ScenarioRuleDialog());
 
     [Fact]
+    public void ScenarioRuleDialog_with_a_condition_row_constructs_detached() => OnStaThread(() =>
+    {
+        var plc = new PlcServerModule(new McPlcServer(new McServerConfig { StartAddress = 30000, Size = 100 }), "PLC");
+        var viewModel = new VirtualPlcServer.ViewModels.ScenarioRuleDialogViewModel(new[] { plc });
+        viewModel.AddConditionCommand.Execute(null);
+        return new ScenarioRuleDialog { DataContext = viewModel };
+    });
+
+    /// <summary>Sits in the shell's caption, outside the PLC theme, so it must not need it.</summary>
+    [Fact]
+    public void BoardLayoutToggle_constructs_detached() => OnStaThread(() => new BoardLayoutToggle());
+
+    [Fact]
+    public void TargetPicker_constructs_detached() => OnStaThread(() => new TargetPicker());
+
+    [Fact]
+    public void ComparisonEditor_constructs_detached() => OnStaThread(() => new ComparisonEditor());
+
+    [Fact]
     public void NodeValueDialog_constructs_detached() => OnStaThread(
         () => new NodeValueDialog(new NodeDefinition("n", PlcDataType.Int32, false, 1, 0)));
 

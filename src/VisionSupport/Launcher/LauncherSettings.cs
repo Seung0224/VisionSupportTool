@@ -93,6 +93,18 @@ public sealed class LauncherSettings
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
         "VisionSupport", "launcher.json");
 
+    /// <summary>
+    /// The path this instance was loaded from, remembered so <see cref="Save()"/> always writes
+    /// back to where it came from - never a hardcoded path a caller has to get right every time.
+    ///
+    /// A test building a bare <c>new LauncherSettings()</c> to hand to a ViewModel (never calling
+    /// <see cref="Load"/>) leaves this null, so <see cref="Save()"/> becomes a no-op instead of
+    /// silently overwriting the real, shared <see cref="DefaultPath"/> file - which is exactly
+    /// what happened before this existed: running the test suite quietly wiped the user's saved
+    /// icon appearance and link list.
+    /// </summary>
+    private string? _sourcePath;
+
     public static LauncherSettings Load(string path)
     {
         LauncherSettings settings = Read(path);
@@ -102,8 +114,16 @@ public sealed class LauncherSettings
         settings.IconSize = ClampIconSize(settings.IconSize);
         settings.TileSize = ClampTileSize(settings.TileSize);
         settings.Links ??= LauncherLink.Defaults();
+        settings._sourcePath = path;
 
         return settings;
+    }
+
+    /// <summary>Saves back to the path this instance was <see cref="Load">loaded</see> from, or
+    /// does nothing if it was never loaded from one.</summary>
+    public void Save()
+    {
+        if (_sourcePath is not null) Save(_sourcePath);
     }
 
     private static LauncherSettings Read(string path)

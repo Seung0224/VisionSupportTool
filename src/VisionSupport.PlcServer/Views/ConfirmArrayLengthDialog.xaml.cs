@@ -22,6 +22,8 @@ namespace VirtualPlcServer.Views
             List<CfgNodeInfo> arrays = nodes.Where(n => n.IsArray).ToList();
             Grid.ItemsSource = arrays;
             SummaryText.Text = "노드 " + nodes.Count + "개 중 배열 " + arrays.Count + "개";
+
+            Closed += (_, _) => AutomationDisconnect.Disconnect(this);
         }
 
         /// <summary>확인된 길이가 반영된 노드 목록(입력 목록과 같은 객체들이다).</summary>

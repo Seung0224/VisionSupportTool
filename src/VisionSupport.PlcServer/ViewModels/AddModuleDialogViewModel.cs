@@ -26,6 +26,44 @@ namespace VirtualPlcServer.ViewModels
             _plcModulesProvider = plcModulesProvider;
         }
 
+        /// <summary>
+        /// 보드에 이미 있는 모듈을 고치는 다이얼로그. 1단계(타입 선택)를 건너뛰고 지금 설정으로 칸을 채운다.
+        /// 통신 서버는 프로토콜을 바꿀 수 없고(맵 종류가 달라진다), 저장하면 같은 Id·생성 시각에 맵 값을
+        /// 옮겨 담은 새 모듈을 돌려준다 - 시나리오 규칙이 모듈을 Id로 가리키기 때문에 Id가 바뀌면 안 된다.
+        /// 시나리오는 이름만 바꾸고 같은 인스턴스를 돌려준다.
+        /// </summary>
+        public static AddModuleDialogViewModel ForEdit(IHardwareModule module, ScenarioEngine scenarioEngine,
+            Func<IEnumerable<PlcServerModule>> plcModulesProvider)
+        {
+            var viewModel = new AddModuleDialogViewModel(scenarioEngine, plcModulesProvider)
+            {
+                _editing = module,
+                ModuleName = module.Name
+            };
+
+            HardwareTypeKind kind = module is ScenarioModule ? HardwareTypeKind.Scenario : HardwareTypeKind.PlcServer;
+            viewModel.SelectedType = ModuleTypeRegistry.Types.First(t => t.Kind == kind);
+            viewModel.TypeChosen = true;
+
+            if (module is PlcServerModule plcModule)
+            {
+                viewModel.LoadServerSettings(plcModule.Server);
+            }
+
+            return viewModel;
+        }
+
+        private IHardwareModule _editing;
+
+        public bool IsEditing => _editing != null;
+
+        /// <summary>새로 만들 때만 고르는 것들(프로토콜, 노드 설정 파일, 마지막 저장 상태 불러오기)을 보여줄지.</summary>
+        public bool IsCreating => !IsEditing;
+
+        public string Title => IsEditing ? "EDIT MODULE" : "ADD MODULE";
+
+        public string ConfirmText => IsEditing ? "SAVE" : "ADD";
+
         public IReadOnlyList<ModuleTypeDescriptor> Types => ModuleTypeRegistry.Types;
 
         [ObservableProperty]
@@ -38,10 +76,13 @@ namespace VirtualPlcServer.ViewModels
 
         public bool IsScenarioSelected => SelectedType?.Kind == HardwareTypeKind.Scenario;
 
+        public bool ShowScenarioHint => IsScenarioSelected && IsCreating;
+
         partial void OnSelectedTypeChanged(ModuleTypeDescriptor value)
         {
             OnPropertyChanged(nameof(IsPlcServerSelected));
             OnPropertyChanged(nameof(IsScenarioSelected));
+            OnPropertyChanged(nameof(ShowScenarioHint));
         }
 
         /// <summary>사용자가 붙이는 모듈 이름. 같은 프로토콜의 모듈을 여러 개 만들 때 서로 구분하고,
@@ -146,6 +187,17 @@ namespace VirtualPlcServer.ViewModels
                 return null;
             }
 
+            if (_editing is ScenarioModule editedScenario)
+            {
+                editedScenario.Rename(ModuleName);
+                return editedScenario;
+            }
+
+            if (_editing is PlcServerModule editedPlc)
+            {
+                return TryRebuildEditedModule(editedPlc);
+            }
+
             if (IsScenarioSelected)
             {
                 return new ScenarioModule(_scenarioEngine, _plcModulesProvider, ModuleName, new List<ScenarioRule>());
@@ -188,6 +240,64 @@ namespace VirtualPlcServer.ViewModels
                 ErrorMessage = ex.Message;
                 return null;
             }
+        }
+
+        private IHardwareModule TryRebuildEditedModule(PlcServerModule original)
+        {
+            try
+            {
+                IPlcServer server = CreateServer(original.Server.ProtocolType);
+
+                // MC는 겹치는 번지만, OPC UA/ADS는 노드 전체를 옮긴다(McMap/NodeMap.RestoreSnapshot 참고).
+                server.Map.RestoreSnapshot(original.Server.Map.CreateSnapshot());
+
+                return new PlcServerModule(server, ModuleName, original.Id, original.CreatedAt);
+            }
+            catch (Exception ex)
+            {
+                ErrorMessage = ex.Message;
+                return null;
+            }
+        }
+
+        private void LoadServerSettings(IPlcServer server)
+        {
+            switch (server)
+            {
+                case McPlcServer mc:
+                    ProtocolIndex = 0;
+                    McListenIp = FormatListenIp(mc.Config.ListenAddress);
+                    McReadPort = mc.Config.ReadPort;
+                    McWritePort = mc.Config.WritePort;
+                    McStartAddress = mc.Config.StartAddress;
+                    McSize = mc.Config.Size;
+                    break;
+                case McTcpPlcServer mcTcp:
+                    ProtocolIndex = 3;
+                    McTcpListenIp = FormatListenIp(mcTcp.Config.ListenAddress);
+                    McTcpReadPort = mcTcp.Config.ReadPort;
+                    McTcpWritePort = mcTcp.Config.WritePort;
+                    McTcpDevice = mcTcp.Config.Device.ToString();
+                    McTcpStartAddress = mcTcp.Config.StartAddress;
+                    McTcpSize = mcTcp.Config.Size;
+                    break;
+                case OpcUaPlcServer opcUa:
+                    ProtocolIndex = 1;
+                    OpcUaPort = opcUa.Config.Port;
+                    OpcUaAppName = opcUa.Config.ApplicationName;
+                    break;
+                case AdsPlcServer ads:
+                    ProtocolIndex = 2;
+                    AdsAmsPort = ads.Config.AmsPort;
+                    AdsPortName = ads.Config.PortName;
+                    break;
+            }
+        }
+
+        /// <summary>"Any"는 입력칸에서 빈칸으로 보인다 - 새로 만들 때 빈칸이 Any를 뜻하는 것과 같게.</summary>
+        private static string FormatListenIp(IPAddress address)
+        {
+            return address == null || IPAddress.Any.Equals(address) ? string.Empty : address.ToString();
         }
 
         // ComboBox 순서(AddModuleDialog.xaml)와 정확히 일치해야 한다: 0=MC(UDP), 1=OPC UA, 2=ADS, 3=MC(TCP/LS).

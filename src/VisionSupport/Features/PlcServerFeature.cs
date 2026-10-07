@@ -57,6 +57,9 @@ public sealed class PlcServerFeature : FeatureModule
 
     protected override UserControl CreateView() => new PlcServerView(ViewModel);
 
+    /// <summary>The card / list switch for the module board, next to the module count.</summary>
+    public override FrameworkElement CreateCaptionTools() => new BoardLayoutToggle { DataContext = ViewModel };
+
     protected override async Task OnStopAsync()
     {
         if (_viewModel is null) return;

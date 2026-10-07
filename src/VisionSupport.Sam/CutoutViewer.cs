@@ -78,6 +78,7 @@ public sealed class CutoutViewer : Window
         {
             if (e.Key == Key.Escape) Close();
         };
+        Closed += (_, _) => AutomationDisconnect.Disconnect(this);
     }
 
     /// <summary>Shrinks to fit <see cref="MaxSide"/> on the longer side; never enlarges, because a

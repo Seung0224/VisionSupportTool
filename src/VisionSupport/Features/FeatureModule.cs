@@ -32,6 +32,8 @@ public abstract class FeatureModule : IFeatureModule
 
     public virtual string StatusLine => string.Empty;
 
+    public virtual FrameworkElement? CreateCaptionTools() => null;
+
     public virtual string Glyph => "None";
 
     public virtual Size PreferredWindowSize => new(1100, 720);

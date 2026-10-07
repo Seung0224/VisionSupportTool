@@ -242,7 +242,7 @@ public sealed partial class LauncherViewModel : ObservableObject
         // one should not be racing another's.
         foreach (IFeatureModule module in _modules) await module.StopAsync();
 
-        _settings.Save(LauncherSettings.DefaultPath);
+        _settings.Save();
         Application.Current.Shutdown();
     }
 
@@ -266,7 +266,7 @@ public sealed partial class LauncherViewModel : ObservableObject
         {
             _links = null;
             _settings.Links = WebLinks.Concat(FolderLinks).ToList();
-            _settings.Save(LauncherSettings.DefaultPath);
+            _settings.Save();
             RebuildItems();
         };
         _links.Show();

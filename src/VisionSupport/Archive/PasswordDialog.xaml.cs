@@ -1,4 +1,5 @@
 using System.Windows;
+using VisionSupport.Shell;
 
 namespace VisionSupport.Archive;
 
@@ -20,6 +21,7 @@ public partial class PasswordDialog : Window
         OkButton.Click += (_, _) => { DialogResult = true; };
         CancelButton.Click += (_, _) => { DialogResult = false; };
         Loaded += (_, _) => Entry.Focus();
+        Closed += (_, _) => AutomationDisconnect.Disconnect(this);
     }
 
     /// <summary>The password to lock a new archive with, or null if the user backed out.</summary>

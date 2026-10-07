@@ -35,7 +35,16 @@ namespace VirtualPlcServer.Modules
 
         public Guid Id { get; }
 
-        public string Name { get; }
+        public string Name { get; private set; }
+
+        /// <summary>보드의 수정 버튼으로 이름만 바꾼다. 규칙과 활성 상태는 그대로다.</summary>
+        public void Rename(string name)
+        {
+            if (!string.IsNullOrWhiteSpace(name))
+            {
+                Name = name.Trim();
+            }
+        }
 
         public string ModuleTypeName => "Scenario";
 
@@ -60,8 +69,15 @@ namespace VirtualPlcServer.Modules
         /// <summary>규칙이 추가/삭제/수정될 때 편집창이 올려서, 보드가 이를 듣고 즉시 저장할 수 있게 한다.</summary>
         public event EventHandler RulesChanged;
 
+        /// <summary>규칙이 추가/수정/삭제된 뒤 편집창이 부른다. 엔진은 맵 구독을 규칙 목록에서 만들어 두므로,
+        /// 켜져 있는 시나리오면 다시 맞춰야 한다 - 그러지 않으면 지운 규칙이 체크박스를 껐다 켤 때까지 계속 돈다.</summary>
         public void NotifyRulesChanged()
         {
+            if (State == ModuleRunState.Running)
+            {
+                _engine.Activate(this);
+            }
+
             RulesChanged?.Invoke(this, EventArgs.Empty);
         }
 

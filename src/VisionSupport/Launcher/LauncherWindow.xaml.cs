@@ -630,6 +630,6 @@ public partial class LauncherWindow : Window
 
         _settings.IconLeft = Left;
         _settings.IconTop = Top;
-        _settings.Save(LauncherSettings.DefaultPath);
+        _settings.Save();
     }
 }

@@ -25,7 +25,22 @@ namespace VirtualPlcServer.ViewModels
 
         public ObservableCollection<ModuleViewModel> Modules { get; } = new ObservableCollection<ModuleViewModel>();
 
-        public bool HasNoModules => Modules.Count == 0;
+        /// <summary>보드 보기 방식: false = 카드(칸을 나눠 채움), true = 목록(한 줄에 모듈 하나).
+        /// 창 제목줄의 토글이 바꾸고, 다음에 열 때도 그대로 열리도록 저장한다.</summary>
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(IsGridLayout))]
+        private bool isListLayout = BoardSettingsStore.Load().IsListLayout;
+
+        public bool IsGridLayout
+        {
+            get => !IsListLayout;
+            set => IsListLayout = !value;
+        }
+
+        partial void OnIsListLayoutChanged(bool value)
+        {
+            BoardSettingsStore.Save(new BoardSettings { IsListLayout = value });
+        }
 
         public MainViewModel()
         {
@@ -33,7 +48,6 @@ namespace VirtualPlcServer.ViewModels
             RestorePersistedModules();
             Modules.CollectionChanged += (s, e) =>
             {
-                OnPropertyChanged(nameof(HasNoModules));
                 _scenarioEngine.NotifyModulesChanged();
                 ModulesChanged?.Invoke(this, EventArgs.Empty);
             };
@@ -68,6 +82,52 @@ namespace VirtualPlcServer.ViewModels
 
             Modules.Add(vm);
             SaveModules();
+        }
+
+        /// <summary>
+        /// 배너의 수정 버튼. 시나리오는 이름만 바꾼다. 통신 서버는 같은 Id로 새로 만든 모듈로 배너를 바꿔
+        /// 끼운다 - 서버 설정(IP/포트/번지)은 소켓을 열 때 한 번만 읽히므로 실행 중인 서버를 고쳐 쓸 수 없다.
+        /// 옛 서버를 멈추고, 옛 서버를 보고 있던 상세 창을 닫고, 실행 중이었으면 새 서버를 다시 시작한다.
+        /// </summary>
+        private async System.Threading.Tasks.Task EditModule(ModuleViewModel vm)
+        {
+            var dialogViewModel = AddModuleDialogViewModel.ForEdit(vm.Module, _scenarioEngine, GetPlcModules);
+            var dialog = new AddModuleDialog { DataContext = dialogViewModel };
+            object result = await DialogHost.Show(dialog, "RootDialog");
+            if (!(result is IHardwareModule edited))
+            {
+                return;
+            }
+
+            if (ReferenceEquals(edited, vm.Module))
+            {
+                vm.RefreshName();
+                SaveModules();
+                ModulesChanged?.Invoke(this, EventArgs.Empty);
+                return;
+            }
+
+            int index = Modules.IndexOf(vm);
+            if (index < 0)
+            {
+                edited.Dispose();
+                return;
+            }
+
+            bool wasRunning = vm.IsRunning;
+            vm.CloseDetailWindows();
+            await vm.Module.StopAsync();
+            vm.Module.Dispose();
+
+            var replacement = new ModuleViewModel(edited);
+            Track(replacement);
+            Modules[index] = replacement;
+            SaveModules();
+
+            if (wasRunning)
+            {
+                await replacement.StartCommand.ExecuteAsync(null);
+            }
         }
 
         private void RemoveModule(ModuleViewModel vm)
@@ -189,6 +249,7 @@ namespace VirtualPlcServer.ViewModels
         private void Track(ModuleViewModel vm)
         {
             vm.DeleteRequested += (s, e) => RemoveModule(vm);
+            vm.EditRequested += async (s, e) => await EditModule(vm);
             vm.DetailWindowOpened += (s, window) => DetailWindowOpened?.Invoke(this, window);
             vm.Module.StateChanged += (s, e) => ModulesChanged?.Invoke(this, EventArgs.Empty);
         }

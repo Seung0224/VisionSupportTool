@@ -1,21 +1,23 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
-using VirtualPlcServer.Core;
+using CommunityToolkit.Mvvm.Input;
 using VirtualPlcServer.Modules;
-using VirtualPlcServer.Protocols.Common;
 using VirtualPlcServer.Scenarios;
 
 namespace VirtualPlcServer.ViewModels
 {
-    /// <summary>"규칙 추가" 다이얼로그의 뷰모델. 트리거(값 변화/값 비교/타이머) + 액션(대상에 값 쓰기)을 구성한다.
-    /// 대상 모듈이 OPC UA/ADS(이름 기반 노드)면 주소를 직접 타이핑하는 대신 실제 노드 목록에서 고르게 하고,
-    /// 그 노드가 배열이면 원소 인덱스를, 문자열이면 텍스트 비교/쓰기 칸을 보여준다.</summary>
+    /// <summary>"규칙 추가" 다이얼로그의 뷰모델. 트리거(값 변화/값 비교/타이머) + AND 추가 조건 + 액션(대상에 값 쓰기)을 구성한다.
+    /// 번지 선택은 TargetPickerViewModel이, 비교(연산자 + 상수 또는 다른 번지)는 ComparisonViewModel이 맡는다.</summary>
     public partial class ScenarioRuleDialogViewModel : ObservableObject
     {
         public ScenarioRuleDialogViewModel(IReadOnlyList<PlcServerModule> availableModules)
         {
             AvailableModules = availableModules;
+            Watch = new TargetPickerViewModel(availableModules);
+            Comparison = new ComparisonViewModel(Watch, availableModules);
+            Action = new TargetPickerViewModel(availableModules);
         }
 
         public IReadOnlyList<PlcServerModule> AvailableModules { get; }
@@ -24,48 +26,18 @@ namespace VirtualPlcServer.ViewModels
         [ObservableProperty]
         private int triggerKindIndex;
 
-        // ---- Watch (트리거 대상) ----
+        public TargetPickerViewModel Watch { get; }
 
-        [ObservableProperty]
-        private PlcServerModule selectedWatchModule;
-
-        /// <summary>MC 모듈일 때만 직접 입력하는 D번지. OPC UA/ADS는 SelectedWatchNode 선택 시 자동으로 채워진다.</summary>
-        [ObservableProperty]
-        private string watchAddress = string.Empty;
-
-        /// <summary>OPC UA/ADS 모듈일 때, 목록에서 고른 노드.</summary>
-        [ObservableProperty]
-        private NodeDefinition selectedWatchNode;
-
-        [ObservableProperty]
-        private int watchArrayIndex;
-
-        /// <summary>CompareOperator enum 순서(Equals, NotEquals, GreaterThan, GreaterOrEqual, LessThan, LessOrEqual)와 일치.</summary>
-        [ObservableProperty]
-        private int operatorIndex;
-
-        [ObservableProperty]
-        private double compareValue;
-
-        [ObservableProperty]
-        private string compareText = string.Empty;
+        public ComparisonViewModel Comparison { get; }
 
         [ObservableProperty]
         private double timerIntervalSeconds = 5;
 
-        // ---- Action (쓰기 대상) ----
+        /// <summary>AND로 붙는 추가 조건 행들.</summary>
+        public ObservableCollection<ScenarioConditionRowViewModel> Conditions { get; } =
+            new ObservableCollection<ScenarioConditionRowViewModel>();
 
-        [ObservableProperty]
-        private PlcServerModule selectedActionModule;
-
-        [ObservableProperty]
-        private string actionAddress = string.Empty;
-
-        [ObservableProperty]
-        private NodeDefinition selectedActionNode;
-
-        [ObservableProperty]
-        private int actionArrayIndex;
+        public TargetPickerViewModel Action { get; }
 
         [ObservableProperty]
         private string actionValueExpression = "0";
@@ -82,74 +54,68 @@ namespace VirtualPlcServer.ViewModels
 
         public bool IsTimerNeeded => TriggerKindIndex == 2;
 
-        public bool IsWatchNodeBased => PlcTargetAccessor.IsNodeBased(SelectedWatchModule);
-
-        public IReadOnlyList<NodeDefinition> WatchModuleNodes => PlcTargetAccessor.GetNodeDefinitions(SelectedWatchModule);
-
-        public bool IsWatchArraySelected => SelectedWatchNode?.IsArray == true;
-
-        public bool IsWatchStringSelected => SelectedWatchNode?.DataType == PlcDataType.String;
-
-        public bool IsActionNodeBased => PlcTargetAccessor.IsNodeBased(SelectedActionModule);
-
-        public IReadOnlyList<NodeDefinition> ActionModuleNodes => PlcTargetAccessor.GetNodeDefinitions(SelectedActionModule);
-
-        public bool IsActionArraySelected => SelectedActionNode?.IsArray == true;
-
-        public bool IsActionStringSelected => SelectedActionNode?.DataType == PlcDataType.String;
+        /// <summary>타이머 규칙에서는 추가 조건이 "IF"(거름 조건), 그 외에는 "AND"로 읽힌다.</summary>
+        public string ConditionsHeader => IsTimerNeeded ? "ONLY IF (ALL)" : "AND";
 
         partial void OnTriggerKindIndexChanged(int value)
         {
             OnPropertyChanged(nameof(IsWatchNeeded));
             OnPropertyChanged(nameof(IsCompareNeeded));
             OnPropertyChanged(nameof(IsTimerNeeded));
+            OnPropertyChanged(nameof(ConditionsHeader));
         }
 
-        partial void OnSelectedWatchModuleChanged(PlcServerModule value)
+        /// <summary>기존 규칙을 고치는 중이면 true. 제목과 확인 버튼 글자만 바뀐다.</summary>
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(Title))]
+        [NotifyPropertyChangedFor(nameof(ConfirmText))]
+        private bool isEditing;
+
+        public string Title => IsEditing ? "EDIT RULE" : "ADD RULE";
+
+        public string ConfirmText => IsEditing ? "SAVE" : "ADD RULE";
+
+        [RelayCommand]
+        private void AddCondition()
         {
-            SelectedWatchNode = null;
-            WatchAddress = string.Empty;
-            OnPropertyChanged(nameof(IsWatchNodeBased));
-            OnPropertyChanged(nameof(WatchModuleNodes));
+            NewConditionRow();
         }
 
-        partial void OnSelectedWatchNodeChanged(NodeDefinition value)
+        private ScenarioConditionRowViewModel NewConditionRow()
         {
-            WatchArrayIndex = 0;
-            if (value != null)
+            var row = new ScenarioConditionRowViewModel(AvailableModules);
+            row.RemoveRequested += (s, e) => Conditions.Remove(row);
+            Conditions.Add(row);
+            return row;
+        }
+
+        /// <summary>저장된 규칙으로 모든 칸을 채운다(수정 모드). TryBuildRule은 새 규칙을 만들므로,
+        /// 호출한 쪽이 원래 규칙의 Id를 이어 붙인다.</summary>
+        public void LoadFrom(ScenarioRule rule)
+        {
+            IsEditing = true;
+            TriggerKindIndex = (int)rule.Trigger;
+            TimerIntervalSeconds = rule.TimerIntervalSeconds;
+
+            Watch.Load(rule.WatchTarget);
+            Comparison.Load(rule.Operator, rule.CompareValue, rule.CompareText, rule.CompareTarget);
+
+            Conditions.Clear();
+            foreach (ScenarioCondition condition in rule.Conditions ?? new List<ScenarioCondition>())
             {
-                WatchAddress = value.Name;
+                NewConditionRow().Load(condition);
             }
 
-            OnPropertyChanged(nameof(IsWatchArraySelected));
-            OnPropertyChanged(nameof(IsWatchStringSelected));
-        }
-
-        partial void OnSelectedActionModuleChanged(PlcServerModule value)
-        {
-            SelectedActionNode = null;
-            ActionAddress = string.Empty;
-            OnPropertyChanged(nameof(IsActionNodeBased));
-            OnPropertyChanged(nameof(ActionModuleNodes));
-        }
-
-        partial void OnSelectedActionNodeChanged(NodeDefinition value)
-        {
-            ActionArrayIndex = 0;
-            if (value != null)
-            {
-                ActionAddress = value.Name;
-            }
-
-            OnPropertyChanged(nameof(IsActionArraySelected));
-            OnPropertyChanged(nameof(IsActionStringSelected));
+            Action.Load(rule.ActionTarget);
+            ActionValueExpression = rule.ActionValueExpression ?? "0";
+            ActionTextValue = rule.ActionTextValue ?? string.Empty;
         }
 
         public ScenarioRule TryBuildRule()
         {
             ErrorMessage = string.Empty;
 
-            if (SelectedActionModule == null || string.IsNullOrWhiteSpace(ActionAddress))
+            if (!Action.IsComplete)
             {
                 ErrorMessage = "Choose an action target module and address.";
                 return null;
@@ -158,15 +124,10 @@ namespace VirtualPlcServer.ViewModels
             var rule = new ScenarioRule
             {
                 Trigger = (TriggerKind)TriggerKindIndex,
-                ActionTarget = new TargetRef
-                {
-                    ModuleId = SelectedActionModule.Id,
-                    Address = ActionAddress.Trim(),
-                    ArrayIndex = IsActionArraySelected ? ActionArrayIndex : (int?)null
-                }
+                ActionTarget = Action.ToTargetRef()
             };
 
-            if (IsActionStringSelected)
+            if (Action.IsStringSelected)
             {
                 rule.ActionTextValue = ActionTextValue ?? string.Empty;
             }
@@ -186,36 +147,51 @@ namespace VirtualPlcServer.ViewModels
 
             if (rule.Trigger != TriggerKind.OnTimer)
             {
-                if (SelectedWatchModule == null || string.IsNullOrWhiteSpace(WatchAddress))
+                if (!Watch.IsComplete)
                 {
                     ErrorMessage = "Choose a watch target module and address.";
                     return null;
                 }
 
-                rule.WatchTarget = new TargetRef
-                {
-                    ModuleId = SelectedWatchModule.Id,
-                    Address = WatchAddress.Trim(),
-                    ArrayIndex = IsWatchArraySelected ? WatchArrayIndex : (int?)null
-                };
+                rule.WatchTarget = Watch.ToTargetRef();
             }
 
             if (rule.Trigger == TriggerKind.OnCompare)
             {
-                rule.Operator = (CompareOperator)OperatorIndex;
-                if (IsWatchStringSelected)
+                string comparisonError = Comparison.Validate();
+                if (comparisonError != null)
                 {
-                    rule.CompareText = CompareText ?? string.Empty;
+                    ErrorMessage = comparisonError;
+                    return null;
                 }
-                else
+
+                rule.Operator = Comparison.Operator;
+                rule.CompareTarget = Comparison.BuildCompareTarget();
+                if (Comparison.IsTextValue)
                 {
-                    rule.CompareValue = CompareValue;
+                    rule.CompareText = Comparison.CompareText ?? string.Empty;
+                }
+                else if (Comparison.IsNumberValue)
+                {
+                    rule.CompareValue = Comparison.CompareValue;
                 }
             }
 
             if (rule.Trigger == TriggerKind.OnTimer)
             {
                 rule.TimerIntervalSeconds = Math.Max(0.5, TimerIntervalSeconds);
+            }
+
+            foreach (ScenarioConditionRowViewModel row in Conditions)
+            {
+                ScenarioCondition condition = row.TryBuild(out string conditionError);
+                if (condition == null)
+                {
+                    ErrorMessage = conditionError;
+                    return null;
+                }
+
+                rule.Conditions.Add(condition);
             }
 
             return rule;

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -57,6 +58,11 @@ namespace VirtualPlcServer.ViewModels
 
         public event EventHandler DeleteRequested;
 
+        public event EventHandler EditRequested;
+
+        /// <summary>이 배너가 연 상세 창들. 모듈이 수정으로 새 서버로 바뀌면 옛 서버를 보고 있는 창을 닫는다.</summary>
+        private readonly List<Window> _openWindows = new List<Window>();
+
         /// <summary>
         /// Raised when this banner opens its detail window. The support shell listens so that
         /// stopping the feature also closes the window - one left open would keep polling a
@@ -93,8 +99,30 @@ namespace VirtualPlcServer.ViewModels
         private void View()
         {
             Window window = Module.CreateDetailWindow();
+            _openWindows.Add(window);
+            window.Closed += (s, e) => _openWindows.Remove(window);
             DetailWindowOpened?.Invoke(this, window);
             window.Show();
+        }
+
+        [RelayCommand]
+        private void Edit()
+        {
+            EditRequested?.Invoke(this, EventArgs.Empty);
+        }
+
+        public void CloseDetailWindows()
+        {
+            foreach (Window window in _openWindows.ToArray())
+            {
+                window.Close();
+            }
+        }
+
+        /// <summary>시나리오 이름을 바꾼 뒤 배너 글자를 다시 읽게 한다.</summary>
+        public void RefreshName()
+        {
+            OnPropertyChanged(nameof(Name));
         }
 
         [RelayCommand]

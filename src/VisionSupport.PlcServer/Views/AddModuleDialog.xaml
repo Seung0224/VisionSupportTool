@@ -33,7 +33,7 @@
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <TextBlock Grid.Row="0" Text="ADD MODULE" FontSize="18" FontWeight="Bold" Margin="0,0,0,16" />
+        <TextBlock Grid.Row="0" Text="{Binding Title}" FontSize="18" FontWeight="Bold" Margin="0,0,0,16" />
 
         <!-- Step 1: pick a module type -->
         <ItemsControl Grid.Row="1" ItemsSource="{Binding Types}"
@@ -77,7 +77,7 @@
             <!-- Communication server fields -->
             <StackPanel Visibility="{Binding IsPlcServerSelected, Converter={StaticResource BooleanToVisibilityConverter}}">
                 <ComboBox materialDesign:HintAssist.Hint="Protocol"
-                          SelectedIndex="{Binding ProtocolIndex}" Margin="0,0,0,8">
+                          SelectedIndex="{Binding ProtocolIndex}" IsEnabled="{Binding IsCreating}" Margin="0,0,0,8">
                     <ComboBoxItem Content="MC Protocol (Mitsubishi, UDP)" />
                     <ComboBoxItem Content="OPC UA" />
                     <ComboBoxItem Content="TwinCAT ADS" />
@@ -107,10 +107,12 @@
                 <StackPanel Visibility="{Binding ProtocolIndex, Converter={StaticResource IntEqualsToVisibilityConverter}, ConverterParameter=1}">
                     <TextBox materialDesign:HintAssist.Hint="Port" Text="{Binding OpcUaPort}" Margin="0,4" />
                     <TextBox materialDesign:HintAssist.Hint="Application Name" Text="{Binding OpcUaAppName}" Margin="0,4" />
-                    <CheckBox Content="Seed default Jastech nodes" IsChecked="{Binding OpcUaSeedJastechNodes}" Margin="0,8,0,0" />
+                    <CheckBox Content="Seed default Jastech nodes" IsChecked="{Binding OpcUaSeedJastechNodes}" Margin="0,8,0,0"
+                              Visibility="{Binding IsCreating, Converter={StaticResource BooleanToVisibilityConverter}}" />
 
-                    <!-- 설정 파일을 고르면 그 파일 기준으로 노드를 만든다(기본 노드 대신). 비워두면 위 체크박스대로 동작. -->
-                    <Grid Margin="0,8,0,0">
+                    <!-- 설정 파일을 고르면 그 파일 기준으로 노드를 만든다(기본 노드 대신). 비워두면 위 체크박스대로 동작.
+                         수정할 때는 노드를 기존 모듈에서 그대로 옮기므로 숨긴다. -->
+                    <Grid Margin="0,8,0,0" Visibility="{Binding IsCreating, Converter={StaticResource BooleanToVisibilityConverter}}">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
@@ -131,11 +133,17 @@
                     <TextBox materialDesign:HintAssist.Hint="Port Name" Text="{Binding AdsPortName}" Margin="0,4" />
                 </StackPanel>
 
-                <CheckBox Content="Load last saved state (matched by module name)" IsChecked="{Binding LoadLastState}" Margin="0,12,0,0" />
+                <CheckBox Content="Load last saved state (matched by module name)" IsChecked="{Binding LoadLastState}" Margin="0,12,0,0"
+                          Visibility="{Binding IsCreating, Converter={StaticResource BooleanToVisibilityConverter}}" />
+
+                <!-- 수정: 저장하면 값을 옮겨 담은 새 서버로 바뀌고, 실행 중이었으면 다시 시작된다 -->
+                <TextBlock Visibility="{Binding IsEditing, Converter={StaticResource BooleanToVisibilityConverter}}"
+                           Text="Saving restarts the server if it is running. Values in addresses that are still in range are kept, and scenario rules stay linked to this module."
+                           TextWrapping="Wrap" Foreground="Gray" FontSize="12" Margin="0,12,0,0" />
             </StackPanel>
 
             <!-- Scenario: nothing else to configure up front - rules are added afterward from the module's own editor window -->
-            <TextBlock Visibility="{Binding IsScenarioSelected, Converter={StaticResource BooleanToVisibilityConverter}}"
+            <TextBlock Visibility="{Binding ShowScenarioHint, Converter={StaticResource BooleanToVisibilityConverter}}"
                        Text="A Scenario starts with no rules. Add it, then open it from the board to add trigger/action rules referencing your PLC modules."
                        TextWrapping="Wrap" Foreground="Gray" FontSize="12" Margin="0,4,0,0" />
 
@@ -145,13 +153,14 @@
             <Grid Margin="0,20,0,0">
                 <Button Content="BACK" Command="{Binding BackCommand}"
                         Style="{StaticResource MaterialDesignFlatButton}"
-                        HorizontalAlignment="Left" />
+                        HorizontalAlignment="Left"
+                        Visibility="{Binding IsCreating, Converter={StaticResource BooleanToVisibilityConverter}}" />
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                     <Button Content="CANCEL"
                             Style="{StaticResource MaterialDesignFlatButton}"
                             Command="{x:Static materialDesign:DialogHost.CloseDialogCommand}"
                             Margin="0,0,8,0" />
-                    <Button Content="ADD" Click="OnAddClicked"
+                    <Button Content="{Binding ConfirmText}" Click="OnAddClicked"
                             Style="{StaticResource MaterialDesignRaisedButton}" />
                 </StackPanel>
             </Grid>

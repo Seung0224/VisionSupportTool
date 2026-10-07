@@ -31,6 +31,7 @@ public partial class FeatureWindow : Window
         Width = module.PreferredWindowSize.Width;
         Height = module.PreferredWindowSize.Height;
         Host.Content = module.GetOrCreateView();
+        CaptionTools.Content = module.CreateCaptionTools();
 
         MinimizeButton.Click += (_, _) => WindowState = WindowState.Minimized;
         MaximizeButton.Click += (_, _) => WindowState = WindowState == WindowState.Maximized
@@ -54,6 +55,8 @@ public partial class FeatureWindow : Window
         {
             module.Changed -= OnModuleChanged;
             Host.Content = null;
+            CaptionTools.Content = null;
+            AutomationDisconnect.Disconnect(this);
         };
 
         RefreshCaption();

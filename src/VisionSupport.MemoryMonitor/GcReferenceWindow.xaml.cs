@@ -23,6 +23,7 @@ public partial class GcReferenceWindow : Window
             DwmSetWindowAttribute(new WindowInteropHelper(this).Handle,
                 DwmwaUseImmersiveDarkMode, ref enabled, sizeof(int));
         };
+        Closed += (_, _) => AutomationDisconnect.Disconnect(this);
     }
 
     public IReadOnlyList<GcTermRow> Reasons => GcReference.Reasons;

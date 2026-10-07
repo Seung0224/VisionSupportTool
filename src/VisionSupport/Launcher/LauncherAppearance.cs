@@ -136,7 +136,7 @@ public sealed partial class LauncherAppearance : ObservableObject
 
     public double MaxTileSize => LauncherSettings.MaxTileSize;
 
-    public void Save() => _settings.Save(LauncherSettings.DefaultPath);
+    public void Save() => _settings.Save();
 
     /// <summary>
     /// HSV to RGB. WPF has no such conversion, and hue is the only sensible thing to put behind a

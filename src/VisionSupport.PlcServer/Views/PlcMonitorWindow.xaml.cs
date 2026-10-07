@@ -28,6 +28,8 @@ namespace VirtualPlcServer.Views
                     HostContent.Content = new NodeMonitorView(ads.NodeMap, module.SummaryInfo);
                     break;
             }
+
+            Closed += (_, _) => AutomationDisconnect.Disconnect(this);
         }
     }
 }

@@ -43,9 +43,15 @@
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
                                 <TextBlock Grid.Column="0" Text="{Binding Description}" TextWrapping="Wrap" VerticalAlignment="Center" />
-                                <Button Grid.Column="1" Command="{Binding DeleteCommand}"
+                                <Button Grid.Column="1" Command="{Binding EditCommand}"
+                                        Style="{StaticResource MaterialDesignIconButton}"
+                                        Width="28" Height="28" Padding="0" ToolTip="Edit Rule">
+                                    <TextBlock Text="✎" FontSize="14" />
+                                </Button>
+                                <Button Grid.Column="2" Command="{Binding DeleteCommand}"
                                         Style="{StaticResource MaterialDesignIconButton}"
                                         Width="28" Height="28" Padding="0" ToolTip="Remove Rule">
                                     <TextBlock Text="✕" FontSize="12" />
