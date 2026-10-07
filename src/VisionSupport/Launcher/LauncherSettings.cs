@@ -40,13 +40,9 @@ public sealed class LauncherSettings
 
     public const double MaxIconSize = 104;
 
-    /// <summary>One tile of the opened menu. The ring's radius follows it, so the tiles keep
-    /// their spacing whatever size they are.</summary>
-    public const double DefaultTileSize = 56;
-
-    public const double MinTileSize = 40;
-
-    public const double MaxTileSize = 96;
+    /// <summary>One tile of the opened menu. Fixed rather than a setting: the size was settled
+    /// on once and the slider for it was taken out. The ring's radius still follows it.</summary>
+    public const double MenuTileSize = 50;
 
     public double IconLeft { get; set; }
 
@@ -59,8 +55,6 @@ public sealed class LauncherSettings
     public double IconOpacity { get; set; } = DefaultIconOpacity;
 
     public double IconSize { get; set; } = DefaultIconSize;
-
-    public double TileSize { get; set; } = DefaultTileSize;
 
     /// <summary>Ask for a password when packing. The password itself is never stored.</summary>
     public bool UsePassword { get; set; }
@@ -112,7 +106,6 @@ public sealed class LauncherSettings
         settings.IconHue = ClampHue(settings.IconHue);
         settings.IconOpacity = ClampOpacity(settings.IconOpacity);
         settings.IconSize = ClampIconSize(settings.IconSize);
-        settings.TileSize = ClampTileSize(settings.TileSize);
         settings.Links ??= LauncherLink.Defaults();
         settings._sourcePath = path;
 
@@ -196,9 +189,6 @@ public sealed class LauncherSettings
 
     public static double ClampIconSize(double value)
         => double.IsNaN(value) ? DefaultIconSize : Math.Clamp(value, MinIconSize, MaxIconSize);
-
-    public static double ClampTileSize(double value)
-        => double.IsNaN(value) ? DefaultTileSize : Math.Clamp(value, MinTileSize, MaxTileSize);
 
     /// <summary>
     /// Pulls a remembered icon position back somewhere reachable.

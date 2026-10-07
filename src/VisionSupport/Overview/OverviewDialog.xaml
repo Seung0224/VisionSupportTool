@@ -98,12 +98,11 @@
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
 
                     <!-- A live sample of exactly what is on the desktop, so the sliders are not
                          being dragged blind against an icon that may be behind this dialog. -->
-                    <Grid Grid.Column="0" Grid.RowSpan="4" Width="52" Height="52"
+                    <Grid Grid.Column="0" Grid.RowSpan="3" Width="52" Height="52"
                           Margin="0,0,14,0" VerticalAlignment="Center">
                         <Rectangle Fill="{Binding IconBrush}" Stroke="{Binding IconEdgeBrush}"
                                    RadiusX="14" RadiusY="14"
@@ -129,12 +128,6 @@
                                Margin="0,0,10,0" Foreground="{StaticResource FgDim}"/>
                     <Slider Grid.Row="2" Grid.Column="2" Value="{Binding IconSize, Mode=TwoWay}"
                             Minimum="{Binding MinIconSize}" Maximum="{Binding MaxIconSize}"
-                            SmallChange="1" LargeChange="8" VerticalAlignment="Center"/>
-
-                    <TextBlock Grid.Row="3" Grid.Column="1" Text="메뉴 타일 크기" FontSize="12"
-                               Margin="0,0,10,0" Foreground="{StaticResource FgDim}"/>
-                    <Slider Grid.Row="3" Grid.Column="2" Value="{Binding TileSize, Mode=TwoWay}"
-                            Minimum="{Binding MinTileSize}" Maximum="{Binding MaxTileSize}"
                             SmallChange="1" LargeChange="8" VerticalAlignment="Center"/>
                 </Grid>
             </Border>

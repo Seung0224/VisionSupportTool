@@ -76,21 +76,7 @@ public sealed partial class LauncherAppearance : ObservableObject
     }
 
     /// <summary>One tile of the opened menu.</summary>
-    public double TileSize
-    {
-        get => _settings.TileSize;
-        set
-        {
-            double clamped = Math.Round(LauncherSettings.ClampTileSize(value));
-            if (Nearly(_settings.TileSize, clamped)) return;
-
-            _settings.TileSize = clamped;
-            OnPropertyChanged();
-            OnPropertyChanged(nameof(TileIconSize));
-            OnPropertyChanged(nameof(MenuRadius));
-            OnPropertyChanged(nameof(MenuSize));
-        }
-    }
+    public double TileSize => LauncherSettings.MenuTileSize;
 
     /// <summary>The vector icon inside a tile.</summary>
     public double TileIconSize => Math.Round(TileSize * 0.43);
@@ -131,10 +117,6 @@ public sealed partial class LauncherAppearance : ObservableObject
     public double MinIconSize => LauncherSettings.MinIconSize;
 
     public double MaxIconSize => LauncherSettings.MaxIconSize;
-
-    public double MinTileSize => LauncherSettings.MinTileSize;
-
-    public double MaxTileSize => LauncherSettings.MaxTileSize;
 
     public void Save() => _settings.Save();
 
